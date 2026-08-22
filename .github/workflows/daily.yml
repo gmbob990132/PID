@@ -23,10 +23,14 @@ jobs:
         run: python3 ingest.py
       - name: 导出前端 JSON
         run: python3 export_json.py
-      - name: 提交数据与页面（无变化则跳过）
+      - name: 提交数据与页面（无变化则跳过，不报错）
         run: |
           git config user.name  "github-actions"
           git config user.email "actions@github.com"
-          git add -A data/ api/
-          git commit -m "auto update $(TZ=Asia/Shanghai date +%F)" || echo "本次无变化，跳过提交"
-          git push
+          git add -A
+          if git diff --cached --quiet; then
+            echo "本次无变化，跳过提交"
+          else
+            git commit -m "auto update $(TZ=Asia/Shanghai date +%F)"
+            git push
+          fi
