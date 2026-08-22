@@ -7,61 +7,63 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
   :root{
-    --navy:#1a2b4a; --accent:#2a6fdb; --up:#d43f3a; --down:#3a9d3a; --flat:#888;
-    --text:#1c1c1a; --sec:#5f5e5a; --muted:#9a9892; --bg:#f5f6f8; --card:#fff;
-    --border:#e6e4dc; --border2:#cfccc2;
+    --navy:#1f3050; --accent:#2a6fdb; --up:#d43f3a; --down:#3a9d3a; --flat:#999;
+    --text:#1a1a18; --sec:#63625d; --muted:#9c9a93; --bg:#f5f4f1; --card:#fff;
+    --border:#eae7df; --border2:#d6d3ca;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:15px}
-  header{background:var(--navy);color:#fff;padding:14px 20px}
-  header h1{margin:0;font-size:17px;font-weight:600}
-  header .sub{font-size:12px;opacity:.7;margin-top:3px}
-  /* 行业 tab（深色顶栏，配置驱动） */
-  .ind-bar{display:flex;gap:2px;background:var(--navy);padding:0 12px;overflow-x:auto}
-  .ind-btn{border:none;background:none;color:#aab6cc;padding:11px 18px;font-size:15px;
-    cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
-  .ind-btn.on{color:#fff;border-bottom-color:#4d8bf0;font-weight:600}
-  .wrap{max-width:900px;margin:16px auto;padding:0 14px 40px}
-  /* 子 tab（概览/价格/成本/库存，配置驱动） */
-  .sub-bar{display:flex;gap:4px;border-bottom:2px solid #dde;overflow-x:auto}
-  .sub-btn{border:none;background:none;color:var(--sec);padding:9px 16px;font-size:14px;
-    cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap}
-  .sub-btn.on{color:var(--navy);border-bottom-color:var(--accent);font-weight:600}
-  .pane{background:var(--card);padding:16px;border-radius:0 0 10px 10px;
-    box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  header{background:var(--card);color:var(--text);padding:16px 20px 12px}
+  header h1{margin:0;font-size:18px;font-weight:700}
+  header .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  /* 行业 tab（浅色顶栏，下划线） */
+  .ind-bar{display:flex;gap:6px;background:var(--card);padding:0 16px;overflow-x:auto;
+    border-bottom:1px solid var(--border)}
+  .ind-btn{border:none;background:none;color:var(--sec);padding:10px 14px;font-size:16px;
+    cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;margin-bottom:-1px}
+  .ind-btn.on{color:var(--navy);border-bottom-color:var(--navy);font-weight:700}
+  .wrap{max-width:920px;margin:0 auto;padding:16px 16px 48px}
+  /* 子 tab（胶囊按钮） */
+  .sub-bar{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px}
+  .sub-btn{border:1px solid var(--border2);background:var(--card);color:var(--sec);
+    padding:7px 20px;font-size:14px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .sub-btn.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600}
+  .pane{background:transparent;padding:0}
   /* 概览卡 */
-  .grp-title{font-size:12px;color:var(--muted);font-weight:600;margin:14px 0 8px}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  @media (max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}}
-  @media (max-width:430px){.grid{grid-template-columns:1fr}}
-  .card{background:var(--card);border:0.5px solid var(--border);border-radius:12px;padding:11px 13px}
+  .grp-title{font-size:12px;color:var(--muted);font-weight:600;margin:20px 2px 10px;letter-spacing:.5px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media (max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:360px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;
+    padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
   .card .top{display:flex;justify-content:space-between;align-items:center}
-  .card .nm{font-size:12px;color:var(--sec)}
-  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-  .card .val{font-size:21px;font-weight:600;margin-top:3px}
-  .card .u{font-size:11px;color:var(--muted)}
-  .card .chg{font-size:12px;margin-top:1px}
-  .card .yoy{font-size:11px;color:var(--sec);margin-top:2px}
-  .card .src{font-size:11px;color:var(--muted);margin-top:5px}
-  .card .meta-line{font-size:11px;color:var(--muted);margin-top:3px}
+  .card .nm{font-size:13px;color:var(--sec)}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+  .card .val{font-size:28px;font-weight:700;margin-top:8px;letter-spacing:-.5px;line-height:1.1}
+  .card .u{font-size:12px;color:var(--muted);font-weight:400}
+  .card .chg{font-size:13px;margin-top:5px;font-weight:600}
+  .card .yoy{font-size:12px;color:var(--sec);margin-top:3px}
+  .card .meta-line{font-size:12px;color:var(--muted);margin-top:5px}
   /* 时间范围 */
-  .ranges{display:flex;gap:4px;margin:2px 0 12px}
-  .rg{border:0.5px solid var(--border);background:#fff;color:var(--muted);
-    padding:3px 12px;font-size:12px;border-radius:6px;cursor:pointer}
-  .rg.on{background:var(--bg);border-color:var(--border2);color:var(--text)}
+  .ranges{display:flex;gap:6px;margin:4px 0 14px}
+  .rg{border:1px solid var(--border);background:var(--card);color:var(--muted);
+    padding:4px 14px;font-size:12px;border-radius:999px;cursor:pointer}
+  .rg.on{background:var(--navy);border-color:var(--navy);color:#fff}
   .chart{width:100%;height:340px}
   /* 表格：手机可横向滑动 */
-  .tbl-wrap{overflow-x:auto;margin-top:14px}
+  .tbl-wrap{overflow-x:auto;margin-top:14px;background:var(--card);border:1px solid var(--border);
+    border-radius:14px;padding:4px 6px}
   table{width:100%;border-collapse:collapse;font-size:13px;min-width:360px}
-  th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
   th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
-  thead th{background:#fafbfc;color:var(--sec);font-weight:600}
+  tbody tr:last-child td{border-bottom:none}
+  thead th{background:var(--card);color:var(--sec);font-weight:600}
   .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
   .empty{color:var(--muted);padding:36px;text-align:center}
   @media (max-width:600px){
-    .wrap{padding:0 8px 40px}.pane{padding:12px}.chart{height:280px}
-    .sub-btn,.ind-btn{padding-left:12px;padding-right:12px}
+    .wrap{padding:14px 12px 40px}.chart{height:280px}
+    .card{padding:14px 15px;border-radius:14px}.card .val{font-size:24px}
   }
 </style>
 </head>
@@ -109,8 +111,9 @@ function sourceLabel(m){
 function chgClass(v){ return v>0?"up":(v<0?"down":"flat"); }
 function chgText(v,dp){ if(v==null) return "—"; const s=v>0?"▲ +":(v<0?"▼ ":"— "); return s+(v===0?"0":v.toFixed(dp)); }
 function dotColor(m){
-  if(m.last_ingest && m.last_ingest.status==="failed") return "var(--up)";
-  return m.updated_today ? "var(--down)" : "var(--muted)";
+  if(m.last_ingest && m.last_ingest.status==="failed") return "var(--up)";   // 取数失败→红
+  if(!m.latest) return "var(--muted)";                                      // 从无数据→灰
+  return "var(--down)";                                                     // 取数成功→绿
 }
 
 // ====== 启动 ======
