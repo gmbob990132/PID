@@ -431,6 +431,12 @@ def run(db_path):
     conn = sqlite3.connect(db_path)
     try:
         init_db(conn)
+        # 数据源切换过的指标：清掉非当前来源的旧口径残留（如预焙阳极早先手填的 CSV 值），口径统一
+        for m in METRICS:
+            if m.get("source_ref") == "mysteel_lv_table":
+                conn.execute("DELETE FROM observations WHERE metric_id=? AND "
+                             "(source IS NULL OR source NOT LIKE 'mysteel_lv%')", (m["id"],))
+        conn.commit()
         groups = {}
         for m in METRICS:
             if m.get("active", 1) and m["source_ref"] != "derived":
