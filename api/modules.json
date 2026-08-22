@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T08:05:55+00:00",
+  "generated_at": "2026-08-22T08:24:07+00:00",
   "modules": [
     {
       "id": "aluminum",
@@ -81,6 +81,33 @@
           "unit": "万吨",
           "source_type": "free",
           "source_ref": "akshare_lme_stock",
+          "update_freq": "daily"
+        },
+        {
+          "id": "al_alumina_spot",
+          "name": "氧化铝现货",
+          "category": "cost",
+          "unit": "元/吨",
+          "source_type": "free",
+          "source_ref": "akshare_spot_sys",
+          "update_freq": "daily"
+        },
+        {
+          "id": "al_anode",
+          "name": "预焙阳极",
+          "category": "cost",
+          "unit": "元/吨",
+          "source_type": "manual",
+          "source_ref": "manual_csv",
+          "update_freq": "weekly"
+        },
+        {
+          "id": "al_spot_premium",
+          "name": "现货升贴水",
+          "category": "price",
+          "unit": "元/吨",
+          "source_type": "derived",
+          "source_ref": "derived",
           "update_freq": "daily"
         }
       ]

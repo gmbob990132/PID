@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T08:24:07+00:00",
+  "metric": {
+    "id": "al_spot_premium",
+    "name": "现货升贴水",
+    "category": "price",
+    "unit": "元/吨"
+  },
+  "points": [
+    {
+      "date": "2026-08-13",
+      "value": 40.0,
+      "change": null,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-14",
+      "value": -15.0,
+      "change": -55.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-17",
+      "value": 35.0,
+      "change": 50.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-18",
+      "value": -55.0,
+      "change": -90.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-19",
+      "value": -5.0,
+      "change": 50.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-20",
+      "value": 5.0,
+      "change": 10.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-21",
+      "value": -30.0,
+      "change": -35.0,
+      "src_change": null
+    }
+  ]
+}

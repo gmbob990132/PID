@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T08:24:07+00:00",
+  "metric": {
+    "id": "al_anode",
+    "name": "预焙阳极",
+    "category": "cost",
+    "unit": "元/吨"
+  },
+  "points": [
+    {
+      "date": "2026-08-14",
+      "value": 4680.0,
+      "change": null,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-21",
+      "value": 4650.0,
+      "change": -30.0,
+      "src_change": null
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T08:24:07+00:00",
+  "metric": {
+    "id": "al_alumina_spot",
+    "name": "氧化铝现货",
+    "category": "cost",
+    "unit": "元/吨"
+  },
+  "points": []
+}
