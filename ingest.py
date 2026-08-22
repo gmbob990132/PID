@@ -377,8 +377,9 @@ def adapter_mysteel_lv_table(metrics):
             src_chg = float(re.sub(r'[^0-9.\-]', '', chg_raw)) if chg_raw else None
         except Exception:
             src_chg = None
+        region = pick.get('t2', [''])[0]
         out.append({"metric_id": m["id"], "obs_date": d_iso, "value": float(price),
-                    "src_change": src_chg, "source": "mysteel_lv/" + want})
+                    "src_change": src_chg, "source": "mysteel_lv/" + want + "/" + region})
     return out
 
 

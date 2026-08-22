@@ -109,12 +109,21 @@ def export(db_path, out_dir):
             })
 
             latest = rows[-1] if rows else None
+            region = None
+            if latest:
+                srow = conn.execute("SELECT source FROM observations WHERE metric_id=? "
+                                    "ORDER BY obs_date DESC LIMIT 1", (m["id"],)).fetchone()
+                if srow and srow["source"] and srow["source"].startswith("mysteel_lv/"):
+                    parts = srow["source"].split("/")
+                    if len(parts) >= 3:
+                        region = parts[2]
             overview_metrics.append({
                 "id": m["id"], "name": m["name"], "category": m["category"], "unit": m["unit"],
                 "source_type": m["source_type"], "update_freq": m["update_freq"],
                 "latest": None if not latest else {
                     "date": latest["obs_date"], "value": latest["value"],
-                    "mom": latest["mom"], "yoy": yoy},
+                    "mom": latest["mom"], "yoy": yoy,
+                    "src_change": latest["src_change"], "region": region},
                 "updated_today": bool(latest and latest["obs_date"] == today),
                 "last_ingest": li,
             })

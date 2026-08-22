@@ -42,6 +42,7 @@
   .card .chg{font-size:12px;margin-top:1px}
   .card .yoy{font-size:11px;color:var(--sec);margin-top:2px}
   .card .src{font-size:11px;color:var(--muted);margin-top:5px}
+  .card .meta-line{font-size:11px;color:var(--muted);margin-top:3px}
   /* 时间范围 */
   .ranges{display:flex;gap:4px;margin:2px 0 12px}
   .rg{border:0.5px solid var(--border);background:#fff;color:var(--muted);
@@ -76,7 +77,7 @@
 <script>
 // ====== 数据加载：默认内嵌（可直接双击打开）；部署到服务器时改 USE_EMBEDDED=false 走 fetch ======
 const USE_EMBEDDED = false;
-const EMBEDDED = {};  // 上网版不用内嵌，改从仓库 api/ 读
+const EMBEDDED = {};
 async function loadJSON(path){
   if(USE_EMBEDDED){
     if(!(path in EMBEDDED)) throw new Error("缺少内嵌数据："+path);
@@ -182,11 +183,16 @@ async function renderOverview(pane){
       html += '<div class="card"><div class="top"><span class="nm">'+m.name+
         '</span><span class="dot" style="background:'+dotColor(m)+'"></span></div>';
       if(L){
-        html += '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+m.unit+'</span></div>'+
-          '<div class="chg '+chgClass(L.mom)+'">'+chgText(L.mom,dp)+'</div>';
+        html += '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+m.unit+'</span></div>';
+        const chgVal = (L.mom!=null ? L.mom : (L.src_change!=null ? L.src_change : null));
+        if(L.region){
+          html += '<div class="meta-line">'+L.region+' · <span class="'+chgClass(chgVal)+'">'+chgText(chgVal,dp)+'</span></div>';
+        } else {
+          html += '<div class="chg '+chgClass(chgVal)+'">'+chgText(chgVal,dp)+'</div>';
+        }
         if(L.yoy!=null) html+='<div class="yoy">同比 '+chgText(L.yoy,dp)+'</div>';
       } else { html+='<div class="val" style="color:var(--muted)">暂无</div>'; }
-      html += '<div class="src">'+sourceLabel(m)+'</div></div>';
+      html += '</div>';
     });
     html+='</div>';
   });
