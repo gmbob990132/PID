@@ -47,10 +47,11 @@ METRICS = [
      "source_type": "free", "source_ref": "akshare_lme_stock", "update_freq": "daily",
      "params": {"metal": "铝"}},
     {"id": "al_alumina_spot", "name": "氧化铝现货", "category": "cost", "unit": "元/吨",
-     "source_type": "free", "source_ref": "akshare_spot_price_daily", "update_freq": "daily",
-     "params": {"symbol": "AO"}},
+     "source_type": "api", "source_ref": "mysteel_lv_table", "update_freq": "daily",
+     "params": {"name": "氧化铝"}},
     {"id": "al_anode", "name": "预焙阳极", "category": "cost", "unit": "元/吨",
-     "source_type": "manual", "source_ref": "manual_csv", "update_freq": "weekly"},
+     "source_type": "api", "source_ref": "mysteel_lv_table", "update_freq": "daily",
+     "params": {"name": "预焙阳极"}},
     {"id": "al_spot_premium", "name": "现货升贴水", "category": "price", "unit": "元/吨",
      "source_type": "derived", "source_ref": "derived", "update_freq": "daily",
      "params": {"formula": "spot_minus_futures", "minuend": "al_spot_east", "subtrahend": "al_futures_main"}},
@@ -312,8 +313,78 @@ def adapter_akshare_spot_price_daily(metrics):
     return out
 
 
+def adapter_mysteel_lv_table(metrics):
+    """抓 lv.mysteel.com 首页价格表，按品名取（氧化铝/预焙阳极）。日期补全年份。"""
+    if _SELFTEST:
+        return []
+    url = "https://lv.mysteel.com/"
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+               "Referer": "https://lv.mysteel.com/",
+               "Accept": "text/html,application/xhtml+xml"}
+    html = None
+    last_err = None
+    for _attempt in range(3):
+        try:
+            req = Request(url, headers=headers)
+            with urlopen(req, timeout=20) as r:
+                html = r.read().decode('utf-8', 'ignore')
+            break
+        except Exception as e:
+            last_err = e
+            import time as _t
+            _t.sleep(3)
+    if html is None:
+        raise last_err
+
+    row_re = re.compile(r'<tr[^>]*>(.*?)</tr>', re.S)
+    cell_re = re.compile(r'<td[^>]*class="([^"]*)"[^>]*>(.*?)</td>', re.S)
+    parsed = []
+    for tr in row_re.findall(html):
+        cells = {}
+        for cls, val in cell_re.findall(tr):
+            v = re.sub(r'<[^>]+>', '', val).strip()
+            key = cls.split()[0] if cls else ''
+            cells.setdefault(key, []).append(v)
+        if 't1' in cells and 't3' in cells:
+            parsed.append(cells)
+
+    today = datetime.now(CN_TZ).date()
+    out = []
+    for m in metrics:
+        want = m["params"]["name"]
+        region_want = m["params"].get("region")
+        pick = None
+        for c in parsed:
+            if want in c['t1'][0] and (region_want is None or region_want in c.get('t2', [''])[0]):
+                pick = c
+                break
+        if not pick:
+            continue
+        price = pick['t3'][0].replace(',', '')
+        chg_raw = pick['t3'][1] if len(pick['t3']) > 1 else pick.get('t4', [''])[0]
+        md = pick.get('t5', [''])[0]  # 形如 08-21
+        try:
+            mm, dd = md.split('-')
+            y = today.year
+            d_iso = f"{y}-{int(mm):02d}-{int(dd):02d}"
+            # 跨年保护：解析出的月份比当前月大很多，说明是去年
+            if int(mm) - today.month > 6:
+                d_iso = f"{y-1}-{int(mm):02d}-{int(dd):02d}"
+        except Exception:
+            d_iso = today.isoformat()
+        try:
+            src_chg = float(re.sub(r'[^0-9.\-]', '', chg_raw)) if chg_raw else None
+        except Exception:
+            src_chg = None
+        out.append({"metric_id": m["id"], "obs_date": d_iso, "value": float(price),
+                    "src_change": src_chg, "source": "mysteel_lv/" + want})
+    return out
+
+
 ADAPTERS = {
     "mysteel_flash": adapter_mysteel_flash,
+    "mysteel_lv_table": adapter_mysteel_lv_table,
     "akshare_futures_main": adapter_akshare_futures_main,
     "akshare_foreign_hist": adapter_akshare_foreign_hist,
     "akshare_lme_stock": adapter_akshare_lme_stock,
