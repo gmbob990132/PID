@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T07:01:41+00:00",
+  "generated_at": "2026-08-22T07:52:09+00:00",
   "module": "aluminum",
   "today": "2026-08-22",
   "metrics": [
@@ -19,7 +19,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:01:41+00:00",
+        "run_at": "2026-08-22T07:52:05+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -39,7 +39,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:01:41+00:00",
+        "run_at": "2026-08-22T07:52:05+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -59,7 +59,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:01:41+00:00",
+        "run_at": "2026-08-22T07:52:05+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -79,9 +79,29 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:01:41+00:00",
+        "run_at": "2026-08-22T07:52:05+00:00",
         "status": "ok",
         "rows_written": 2
+      }
+    },
+    {
+      "id": "al_futures_main",
+      "name": "沪铝主力",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-08-21",
+        "value": 23710.0,
+        "mom": 115.0,
+        "yoy": 3120.0
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T07:52:05+00:00",
+        "status": "ok",
+        "rows_written": 267
       }
     }
   ]

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T07:01:41+00:00",
+  "generated_at": "2026-08-22T07:52:09+00:00",
   "modules": [
     {
       "id": "aluminum",
@@ -45,6 +45,15 @@
           "source_type": "api",
           "source_ref": "mysteel_flash",
           "update_freq": "biweekly"
+        },
+        {
+          "id": "al_futures_main",
+          "name": "沪铝主力",
+          "category": "price",
+          "unit": "元/吨",
+          "source_type": "free",
+          "source_ref": "akshare_futures_main",
+          "update_freq": "daily"
         }
       ]
     }
