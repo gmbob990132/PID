@@ -1,7 +1,7 @@
 name: daily-update
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 3 * * *'
   workflow_dispatch: {}
 
 permissions:
@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: 安装依赖（akshare）
+        run: pip install -r requirements.txt
       - name: 抓取 → 写库
         run: python3 ingest.py
       - name: 导出前端 JSON
