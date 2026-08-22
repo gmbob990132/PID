@@ -216,27 +216,40 @@ def adapter_akshare_lme_stock(metrics):
 
 
 def adapter_akshare_spot_sys(metrics):
-    """生意社现期图-市场价格（如氧化铝现货）。返回 日期 + 一列市场价。"""
+    """生意社现期图-市场价格（如氧化铝现货）。symbol 需匹配生意社品种名，自动适配。"""
     if _SELFTEST:
         return []
     import akshare as ak
     import pandas as pd
+    try:
+        name_dict = ak.futures_spot_sys.__globals__['__get_sys_spot_futures_dict']()
+    except Exception:
+        name_dict = {}
     out = []
     for m in metrics:
-        df = ak.futures_spot_sys(symbol=m["params"]["symbol"], indicator="市场价格")
+        want = m["params"]["symbol"]
+        sym = want
+        if name_dict and want not in name_dict:
+            cand = [k for k in name_dict if "氧化铝" in str(k)] if want == "氧化铝" \
+                else [k for k in name_dict if want in str(k)]
+            if cand:
+                sym = cand[0]
+            else:
+                al = [k for k in name_dict if "铝" in str(k)]
+                raise ValueError("生意社无品种'" + want + "'，含铝的可选：" + str(al))
+        df = ak.futures_spot_sys(symbol=sym, indicator="市场价格")
         cols = list(df.columns)
         dcol = "日期" if "日期" in cols else cols[0]
-        valcols = [c for c in cols if c != dcol]
-        if not valcols:
+        vcol = "现货价格" if "现货价格" in cols else next((c for c in cols if c != dcol), None)
+        if vcol is None:
             raise ValueError("生意社现货找不到价格列，列为：" + str(cols))
-        vcol = valcols[0]
         for _, r in df.iterrows():
             v = r[vcol]
             if pd.isna(v):
                 continue
             out.append({"metric_id": m["id"], "obs_date": str(pd.to_datetime(r[dcol]).date()),
                         "value": float(v), "src_change": None,
-                        "source": "akshare/futures_spot_sys/" + m["params"]["symbol"]})
+                        "source": "akshare/futures_spot_sys/" + sym})
     return out
 
 
