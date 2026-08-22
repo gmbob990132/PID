@@ -47,8 +47,8 @@ METRICS = [
      "source_type": "free", "source_ref": "akshare_lme_stock", "update_freq": "daily",
      "params": {"metal": "铝"}},
     {"id": "al_alumina_spot", "name": "氧化铝现货", "category": "cost", "unit": "元/吨",
-     "source_type": "free", "source_ref": "akshare_spot_sys", "update_freq": "daily",
-     "params": {"symbol": "氧化铝"}},
+     "source_type": "free", "source_ref": "akshare_spot_price_daily", "update_freq": "daily",
+     "params": {"symbol": "AO"}},
     {"id": "al_anode", "name": "预焙阳极", "category": "cost", "unit": "元/吨",
      "source_type": "manual", "source_ref": "manual_csv", "update_freq": "weekly"},
     {"id": "al_spot_premium", "name": "现货升贴水", "category": "price", "unit": "元/吨",
@@ -129,9 +129,20 @@ def adapter_mysteel_flash(metrics):
     if _SELFTEST:
         raw = _MY_SAMPLE
     else:
-        req = Request(_MY_URL, headers=_MY_HEADERS)
-        with urlopen(req, timeout=20) as resp:
-            raw = json.loads(resp.read().decode('utf-8'))
+        raw = None
+        last_err = None
+        for _attempt in range(3):
+            try:
+                req = Request(_MY_URL, headers=_MY_HEADERS)
+                with urlopen(req, timeout=15) as resp:
+                    raw = json.loads(resp.read().decode('utf-8'))
+                break
+            except Exception as e:
+                last_err = e
+                import time as _t
+                _t.sleep(3)
+        if raw is None:
+            raise last_err
     items = _find_items(raw)
     if items is None:
         raise ValueError("Mysteel 返回里找不到 content 列表，接口结构可能变了")
@@ -272,12 +283,42 @@ def adapter_manual_csv(metrics):
     return out
 
 
+def adapter_akshare_spot_price_daily(metrics):
+    """生意社大宗现货价（按代码，如氧化铝 AO）。每次取最近约10天，靠日积累成历史。"""
+    if _SELFTEST:
+        return []
+    import akshare as ak
+    import pandas as pd
+    from datetime import date as _date, timedelta as _td
+    end = _date.today()
+    start = end - _td(days=10)
+    out = []
+    for m in metrics:
+        code = m["params"]["symbol"]
+        df = ak.futures_spot_price_daily(start_day=start.strftime("%Y%m%d"),
+                                         end_day=end.strftime("%Y%m%d"), vars_list=[code])
+        if df is None or len(df) == 0:
+            continue
+        for _, r in df.iterrows():
+            var = str(r.get("var", ""))
+            if code not in var and "氧化铝" not in var:
+                continue
+            v = r.get("sp")
+            if pd.isna(v) or float(v) == 0:
+                continue
+            out.append({"metric_id": m["id"], "obs_date": str(pd.to_datetime(str(r["date"])).date()),
+                        "value": float(v), "src_change": None,
+                        "source": "akshare/futures_spot_price_daily/" + code})
+    return out
+
+
 ADAPTERS = {
     "mysteel_flash": adapter_mysteel_flash,
     "akshare_futures_main": adapter_akshare_futures_main,
     "akshare_foreign_hist": adapter_akshare_foreign_hist,
     "akshare_lme_stock": adapter_akshare_lme_stock,
     "akshare_spot_sys": adapter_akshare_spot_sys,
+    "akshare_spot_price_daily": adapter_akshare_spot_price_daily,
     "manual_csv": adapter_manual_csv,
 }
 
