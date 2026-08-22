@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>持仓数据看板</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root{
+    --navy:#1a2b4a; --accent:#2a6fdb; --up:#d43f3a; --down:#3a9d3a; --flat:#888;
+    --text:#1c1c1a; --sec:#5f5e5a; --muted:#9a9892; --bg:#f5f6f8; --card:#fff;
+    --border:#e6e4dc; --border2:#cfccc2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:15px}
+  header{background:var(--navy);color:#fff;padding:14px 20px}
+  header h1{margin:0;font-size:17px;font-weight:600}
+  header .sub{font-size:12px;opacity:.7;margin-top:3px}
+  /* 行业 tab（深色顶栏，配置驱动） */
+  .ind-bar{display:flex;gap:2px;background:var(--navy);padding:0 12px;overflow-x:auto}
+  .ind-btn{border:none;background:none;color:#aab6cc;padding:11px 18px;font-size:15px;
+    cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+  .ind-btn.on{color:#fff;border-bottom-color:#4d8bf0;font-weight:600}
+  .wrap{max-width:900px;margin:16px auto;padding:0 14px 40px}
+  /* 子 tab（概览/价格/成本/库存，配置驱动） */
+  .sub-bar{display:flex;gap:4px;border-bottom:2px solid #dde;overflow-x:auto}
+  .sub-btn{border:none;background:none;color:var(--sec);padding:9px 16px;font-size:14px;
+    cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap}
+  .sub-btn.on{color:var(--navy);border-bottom-color:var(--accent);font-weight:600}
+  .pane{background:var(--card);padding:16px;border-radius:0 0 10px 10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  /* 概览卡 */
+  .grp-title{font-size:12px;color:var(--muted);font-weight:600;margin:14px 0 8px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .card{background:var(--card);border:0.5px solid var(--border);border-radius:12px;padding:11px 13px}
+  .card .top{display:flex;justify-content:space-between;align-items:center}
+  .card .nm{font-size:12px;color:var(--sec)}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+  .card .val{font-size:21px;font-weight:600;margin-top:3px}
+  .card .u{font-size:11px;color:var(--muted)}
+  .card .chg{font-size:12px;margin-top:1px}
+  .card .yoy{font-size:11px;color:var(--sec);margin-top:2px}
+  .card .src{font-size:11px;color:var(--muted);margin-top:5px}
+  /* 时间范围 */
+  .ranges{display:flex;gap:4px;margin:2px 0 12px}
+  .rg{border:0.5px solid var(--border);background:#fff;color:var(--muted);
+    padding:3px 12px;font-size:12px;border-radius:6px;cursor:pointer}
+  .rg.on{background:var(--bg);border-color:var(--border2);color:var(--text)}
+  .chart{width:100%;height:340px}
+  /* 表格：手机可横向滑动 */
+  .tbl-wrap{overflow-x:auto;margin-top:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:360px}
+  th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card)}
+  thead th{background:#fafbfc;color:var(--sec);font-weight:600}
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--flat)}
+  .empty{color:var(--muted);padding:36px;text-align:center}
+  @media (max-width:600px){
+    .wrap{padding:0 8px 40px}.pane{padding:12px}.chart{height:280px}
+    .sub-btn,.ind-btn{padding-left:12px;padding-right:12px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>持仓数据看板</h1>
+  <div class="sub" id="subhead">加载中…</div>
+</header>
+<div class="ind-bar" id="indBar"></div>
+<div class="wrap">
+  <div class="sub-bar" id="subBar"></div>
+  <div class="pane" id="pane"></div>
+</div>
+
+<script>
+// ====== 数据加载：默认内嵌（可直接双击打开）；部署到服务器时改 USE_EMBEDDED=false 走 fetch ======
+const USE_EMBEDDED = false;
+const EMBEDDED = {};  // 上网版不用内嵌，改从仓库 api/ 读
+async function loadJSON(path){
+  if(USE_EMBEDDED){
+    if(!(path in EMBEDDED)) throw new Error("缺少内嵌数据："+path);
+    return JSON.parse(JSON.stringify(EMBEDDED[path]));
+  }
+  const r = await fetch(path);
+  if(!r.ok) throw new Error(path+" 加载失败 "+r.status);
+  return r.json();
+}
+
+// ====== 配置：类别 → 子tab 显示名 / 顺序 ======
+const CAT_NAME = {price:"价格", cost:"成本", inventory:"库存"};
+const CAT_ORDER = ["price","cost","inventory"];
+const RANGES = [["1m","近1月",30],["6m","近6月",180],["1y","近1年",365],["all","全部",null]];
+const SERIES_COLORS = ["#2a6fdb","#1d9e75","#ba7517","#8a5cd1","#d4537e"];
+
+let MODULES = [];         // modules.json
+let curMod = null, curSub = null, curRange = "6m";
+let chart = null;
+
+function sourceLabel(m){
+  if(m.source_ref === "mysteel_flash" || m.source_type === "api") return "Mysteel · 接口";
+  if(m.source_type === "free") return "免费接口";
+  if(m.source_type === "derived") return "自算";
+  return m.source_type || "";
+}
+function chgClass(v){ return v>0?"up":(v<0?"down":"flat"); }
+function chgText(v,dp){ if(v==null) return "—"; const s=v>0?"▲ +":(v<0?"▼ ":"— "); return s+(v===0?"0":v.toFixed(dp)); }
+function dotColor(m){
+  if(m.last_ingest && m.last_ingest.status==="failed") return "var(--up)";
+  return m.updated_today ? "var(--down)" : "var(--muted)";
+}
+
+// ====== 启动 ======
+async function boot(){
+  try{
+    const md = await loadJSON("api/modules.json");
+    MODULES = md.modules || [];
+    document.getElementById("subhead").textContent =
+      "数据源 Mysteel 等 · 最近生成 " + (md.generated_at||"").slice(0,16).replace("T"," ");
+    renderIndBar();
+    if(MODULES.length){ selectModule(MODULES[0].id); }
+    else { document.getElementById("pane").innerHTML='<div class="empty">暂无模块</div>'; }
+  }catch(e){
+    document.getElementById("pane").innerHTML='<div class="empty">加载失败：'+e.message+'</div>';
+  }
+}
+
+function renderIndBar(){
+  const bar = document.getElementById("indBar");
+  bar.innerHTML = "";
+  MODULES.forEach(m=>{
+    const b=document.createElement("button");
+    b.className="ind-btn"+(m.id===curMod?" on":"");
+    b.textContent=m.name;
+    b.onclick=()=>selectModule(m.id);
+    bar.appendChild(b);
+  });
+}
+
+async function selectModule(id){
+  curMod=id;
+  renderIndBar();
+  const mod = MODULES.find(m=>m.id===id);
+  // 子tab：概览 + 该模块出现过的类别（配置驱动）
+  const cats = CAT_ORDER.filter(c=> mod.metrics.some(x=>x.category===c));
+  const subs = ["overview"].concat(cats);
+  curSub = subs[0];
+  renderSubBar(subs);
+  renderPane();
+}
+
+function renderSubBar(subs){
+  const bar=document.getElementById("subBar");
+  bar.innerHTML="";
+  subs.forEach(s=>{
+    const b=document.createElement("button");
+    b.className="sub-btn"+(s===curSub?" on":"");
+    b.textContent = s==="overview" ? "概览" : (CAT_NAME[s]||s);
+    b.onclick=()=>{ curSub=s; renderSubBar(subs); renderPane(); };
+    bar.appendChild(b);
+  });
+}
+
+async function renderPane(){
+  const pane=document.getElementById("pane");
+  chart=null;
+  if(curSub==="overview"){ await renderOverview(pane); }
+  else { await renderCategory(pane, curSub); }
+}
+
+// ------ 概览 ------
+async function renderOverview(pane){
+  const ov = await loadJSON("api/overview/"+curMod+".json");
+  const byCat={};
+  ov.metrics.forEach(m=>{ (byCat[m.category]=byCat[m.category]||[]).push(m); });
+  let html="";
+  CAT_ORDER.filter(c=>byCat[c]).forEach(c=>{
+    html += '<div class="grp-title">'+(CAT_NAME[c]||c)+'</div><div class="grid">';
+    byCat[c].forEach(m=>{
+      const L=m.latest;
+      const dp = m.unit==="万吨"?1:0;
+      html += '<div class="card"><div class="top"><span class="nm">'+m.name+
+        '</span><span class="dot" style="background:'+dotColor(m)+'"></span></div>';
+      if(L){
+        html += '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+m.unit+'</span></div>'+
+          '<div class="chg '+chgClass(L.mom)+'">'+chgText(L.mom,dp)+'</div>';
+        if(L.yoy!=null) html+='<div class="yoy">同比 '+chgText(L.yoy,dp)+'</div>';
+      } else { html+='<div class="val" style="color:var(--muted)">暂无</div>'; }
+      html += '<div class="src">'+sourceLabel(m)+'</div></div>';
+    });
+    html+='</div>';
+  });
+  pane.innerHTML = html || '<div class="empty">暂无数据</div>';
+}
+
+// ------ 类别详情（图 + 表）------
+async function renderCategory(pane, cat){
+  const mod = MODULES.find(m=>m.id===curMod);
+  const metrics = mod.metrics.filter(x=>x.category===cat);
+  // 时间范围按钮
+  let html='<div class="ranges">';
+  RANGES.forEach(([k,label])=> html+='<span class="rg'+(k===curRange?" on":"")+'" data-r="'+k+'">'+label+'</span>');
+  html+='</div><div class="chart" id="chart"></div><div class="tbl-wrap" id="tbl"></div>';
+  pane.innerHTML=html;
+  pane.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ curRange=el.dataset.r; renderCategory(pane,cat); });
+
+  // 载入各指标序列
+  const seriesData = {};
+  for(const m of metrics){
+    const s = await loadJSON("api/series/"+m.id+".json");
+    seriesData[m.id] = s.points || [];
+  }
+  const cutoff = rangeCutoff(curRange);
+  const dp = metrics[0] && metrics[0].unit==="万吨"?1:0;
+
+  // x 轴 = 所有日期并集（过滤范围）
+  const dateSet=new Set();
+  metrics.forEach(m=> seriesData[m.id].forEach(p=>{ if(!cutoff||p.date>=cutoff) dateSet.add(p.date); }));
+  const dates=[...dateSet].sort();
+
+  drawChart(metrics, seriesData, dates, dp);
+  drawTable(metrics, seriesData, dates, dp);
+}
+
+function rangeCutoff(k){
+  const days={"1m":30,"6m":180,"1y":365,"all":null}[k];
+  if(!days) return null;
+  const d=new Date(); d.setDate(d.getDate()-days);
+  return d.toISOString().slice(0,10);
+}
+
+function drawChart(metrics, seriesData, dates, dp){
+  const el=document.getElementById("chart");
+  chart=echarts.init(el);
+  const series=metrics.map((m,i)=>{
+    const map={}; seriesData[m.id].forEach(p=>map[p.date]=p.value);
+    return {name:m.name, type:"line", smooth:false, showSymbol:true, symbolSize:4,
+      lineStyle:{width:2}, itemStyle:{color:SERIES_COLORS[i%SERIES_COLORS.length]},
+      data:dates.map(d=> d in map?map[d]:null), connectNulls:true};
+  });
+  chart.setOption({
+    grid:{left:8,right:12,top:36,bottom:24,containLabel:true},
+    legend:{top:0, data:metrics.map(m=>m.name), icon:"roundRect", itemWidth:14, itemHeight:3},
+    tooltip:{trigger:"axis", valueFormatter:v=> v==null?"—":v.toFixed(dp)},
+    xAxis:{type:"category", data:dates, boundaryGap:false,
+      axisLabel:{color:"#888", formatter:v=>v.slice(5)}, axisLine:{lineStyle:{color:"#ddd"}}},
+    yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:"#eee"}},
+      axisLabel:{color:"#888"}},
+    series: series,
+  });
+}
+
+function drawTable(metrics, seriesData, dates, dp){
+  const maps={}; metrics.forEach(m=>{ maps[m.id]={}; seriesData[m.id].forEach(p=>maps[m.id][p.date]=p); });
+  let h='<table><thead><tr><th>日期</th>';
+  metrics.forEach(m=> h+='<th>'+m.name+'</th>');
+  h+='</tr></thead><tbody>';
+  [...dates].reverse().forEach(d=>{
+    h+='<tr><td>'+d+'</td>';
+    metrics.forEach(m=>{
+      const p=maps[m.id][d];
+      if(!p){ h+='<td>—</td>'; return; }
+      const c=p.change;
+      const chg = c==null?"":' <span class="'+chgClass(c)+'">('+(c>0?"+":"")+(c===0?"0":c.toFixed(dp))+')</span>';
+      h+='<td>'+p.value.toLocaleString()+chg+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  document.getElementById("tbl").innerHTML=h;
+}
+
+window.addEventListener("resize", ()=>{ if(chart) chart.resize(); });
+boot();
+</script>
+</body>
+</html>
