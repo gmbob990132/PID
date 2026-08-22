@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T15:24:21+00:00",
+  "generated_at": "2026-08-22T15:36:48+00:00",
   "modules": [
     {
       "id": "aluminum",
@@ -89,7 +89,7 @@
           "category": "cost",
           "unit": "元/吨",
           "source_type": "free",
-          "source_ref": "akshare_spot_sys",
+          "source_ref": "akshare_spot_price_daily",
           "update_freq": "daily"
         },
         {
