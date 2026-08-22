@@ -6,14 +6,14 @@ A-3 导出脚本：把库里的数据按数据契约导出成前端要的 JSON�
 阶段2 换成真 API 时前端只改请求地址、JSON 形状不变。
 
 用法：
-    python3 export_json.py                    # 读 data/portfolio.db → 写 data/api/
+    python3 export_json.py                    # 读 data/portfolio.db → 写 api/
     python3 export_json.py data/selftest.db   # 指定库
 
 产出（对应契约）：
-    data/api/modules.json              →  将来的 GET /api/modules
-    data/api/overview/<module>.json    →  GET /api/overview/{module}
-    data/api/series/<metric>.json      →  GET /api/metrics/{id}/series
-    data/api/status.json               →  GET /api/status
+    api/modules.json              →  将来的 GET /api/modules
+    api/overview/<module>.json    →  GET /api/overview/{module}
+    api/series/<metric>.json      →  GET /api/metrics/{id}/series
+    api/status.json               →  GET /api/status
 """
 import os
 import sys
@@ -25,7 +25,7 @@ SCHEMA_VERSION = 1
 CN_TZ = timezone(timedelta(hours=8))
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "data", "portfolio.db")
-OUT_DIR = os.path.join(HERE, "data", "api")
+OUT_DIR = os.path.join(HERE, "api")
 
 # 每个点带自算环比（LAG）；口径归我们自己
 SERIES_SQL = """
