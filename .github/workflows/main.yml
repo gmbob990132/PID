@@ -1,0 +1,36 @@
+name: probe-mysteel
+on:
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 1) runner 出口 IP / 地区
+        continue-on-error: true
+        run: curl -s --max-time 10 https://ipinfo.io/json || echo "(取不到，忽略)"
+
+      - name: 2) 原始探测——直接 curl 接口
+        continue-on-error: true
+        run: |
+          URL='https://openapi.mysteel.com/without_sign/newsflash/flashnews/query_by_tags.htm?advertisementFlag=0&keyword=&pageNo=1&pageSize=30&sortByScore=false&columnIds=%255B%255B2%252C84%252C584%255D%255D&breedTagId=4437'
+          echo "=== 状态码与耗时 ==="
+          curl -s -o /dev/null -w "HTTP %{http_code}  用时 %{time_total}s\n" --max-time 25 \
+            -H 'User-Agent: Mozilla/5.0' -H 'Referer: https://www.mysteel.com/fastcomment/' "$URL" || echo "curl 失败"
+          echo ""
+          echo "=== 返回内容前 400 字 ==="
+          curl -s --max-time 25 -H 'User-Agent: Mozilla/5.0' -H 'Referer: https://www.mysteel.com/fastcomment/' "$URL" | head -c 400 || echo "(取不到)"
+
+      - name: 3) 跑 ingest.py + query.py
+        continue-on-error: true
+        run: |
+          echo "=== ingest.py ==="
+          python3 ingest.py
+          echo ""
+          echo "=== query.py ==="
+          python3 query.py || echo "(库里还没有数据)"
