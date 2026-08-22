@@ -46,6 +46,14 @@ METRICS = [
     {"id": "al_lme_inv", "name": "LME库存", "category": "inventory", "unit": "万吨",
      "source_type": "free", "source_ref": "akshare_lme_stock", "update_freq": "daily",
      "params": {"metal": "铝"}},
+    {"id": "al_alumina_spot", "name": "氧化铝现货", "category": "cost", "unit": "元/吨",
+     "source_type": "free", "source_ref": "akshare_spot_sys", "update_freq": "daily",
+     "params": {"symbol": "氧化铝"}},
+    {"id": "al_anode", "name": "预焙阳极", "category": "cost", "unit": "元/吨",
+     "source_type": "manual", "source_ref": "manual_csv", "update_freq": "weekly"},
+    {"id": "al_spot_premium", "name": "现货升贴水", "category": "price", "unit": "元/吨",
+     "source_type": "derived", "source_ref": "derived", "update_freq": "daily",
+     "params": {"formula": "spot_minus_futures", "minuend": "al_spot_east", "subtrahend": "al_futures_main"}},
 ]
 
 _MY_URL = ("https://openapi.mysteel.com/without_sign/newsflash/flashnews/query_by_tags.htm"
@@ -207,11 +215,57 @@ def adapter_akshare_lme_stock(metrics):
     return out
 
 
+def adapter_akshare_spot_sys(metrics):
+    """生意社现期图-市场价格（如氧化铝现货）。返回 日期 + 一列市场价。"""
+    if _SELFTEST:
+        return []
+    import akshare as ak
+    import pandas as pd
+    out = []
+    for m in metrics:
+        df = ak.futures_spot_sys(symbol=m["params"]["symbol"], indicator="市场价格")
+        cols = list(df.columns)
+        dcol = "日期" if "日期" in cols else cols[0]
+        valcols = [c for c in cols if c != dcol]
+        if not valcols:
+            raise ValueError("生意社现货找不到价格列，列为：" + str(cols))
+        vcol = valcols[0]
+        for _, r in df.iterrows():
+            v = r[vcol]
+            if pd.isna(v):
+                continue
+            out.append({"metric_id": m["id"], "obs_date": str(pd.to_datetime(r[dcol]).date()),
+                        "value": float(v), "src_change": None,
+                        "source": "akshare/futures_spot_sys/" + m["params"]["symbol"]})
+    return out
+
+
+def adapter_manual_csv(metrics):
+    """手动录入：读 manual_prices.csv（列 metric_id,date,value）。低频数据手填。"""
+    import csv
+    path = os.path.join(HERE, "manual_prices.csv")
+    if not os.path.exists(path):
+        return []
+    wanted = {m["id"] for m in metrics}
+    out = []
+    with open(path, encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            mid = (row.get("metric_id") or "").strip()
+            d = (row.get("date") or "").strip()
+            v = (row.get("value") or "").strip()
+            if mid in wanted and d and v:
+                out.append({"metric_id": mid, "obs_date": d, "value": float(v),
+                            "src_change": None, "source": "manual"})
+    return out
+
+
 ADAPTERS = {
     "mysteel_flash": adapter_mysteel_flash,
     "akshare_futures_main": adapter_akshare_futures_main,
     "akshare_foreign_hist": adapter_akshare_foreign_hist,
     "akshare_lme_stock": adapter_akshare_lme_stock,
+    "akshare_spot_sys": adapter_akshare_spot_sys,
+    "manual_csv": adapter_manual_csv,
 }
 
 
@@ -253,7 +307,7 @@ def run(db_path):
         init_db(conn)
         groups = {}
         for m in METRICS:
-            if m.get("active", 1):
+            if m.get("active", 1) and m["source_ref"] != "derived":
                 groups.setdefault(m["source_ref"], []).append(m)
 
         all_by_metric = {}
@@ -288,6 +342,32 @@ def run(db_path):
                 conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
                              "VALUES(?,?,?,?,?,?)", (source_ref, m["id"], now_utc, st, len(got), msg))
                 all_by_metric[m["id"]] = got
+
+        # 衍生指标（自算，读库计算，如现货升贴水 = 现货 − 主力）
+        for m in METRICS:
+            if not m.get("active", 1) or m["source_ref"] != "derived":
+                continue
+            p = m.get("params", {})
+            rows = []
+            if p.get("formula") == "spot_minus_futures":
+                rows = conn.execute(
+                    "SELECT a.obs_date, a.value - b.value FROM observations a "
+                    "JOIN observations b ON a.obs_date = b.obs_date "
+                    "WHERE a.metric_id=? AND b.metric_id=?",
+                    (p["minuend"], p["subtrahend"])).fetchall()
+            got = []
+            for d, val in rows:
+                conn.execute(
+                    "INSERT INTO observations(metric_id,obs_date,value,src_change,source,status,ingested_at) "
+                    "VALUES(?,?,?,?,?,'ok',?) ON CONFLICT(metric_id,obs_date) DO UPDATE SET "
+                    "value=excluded.value, source=excluded.source, ingested_at=excluded.ingested_at",
+                    (m["id"], d, val, None, "derived", now_utc))
+                got.append({"metric_id": m["id"], "obs_date": d, "value": val, "src_change": None})
+            st = "ok" if got else "no_data"
+            conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
+                         "VALUES(?,?,?,?,?,?)", ("derived", m["id"], now_utc, st, len(got),
+                                                 "computed" if got else "缺少输入数据"))
+            all_by_metric[m["id"]] = got
         conn.commit()
 
         today = datetime.now(CN_TZ).date().isoformat()
