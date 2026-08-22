@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T07:01:41+00:00",
+  "today": "2026-08-22",
+  "summary": {
+    "ok": 4,
+    "no_data": 0,
+    "failed": 0
+  },
+  "sources": [
+    {
+      "metric_id": "al_spot_east",
+      "name": "现货·华东",
+      "latest_date": "2026-08-21",
+      "updated_today": false,
+      "last_run": "2026-08-22T07:01:41+00:00",
+      "status": "ok"
+    },
+    {
+      "metric_id": "al_spot_south",
+      "name": "现货·华南",
+      "latest_date": "2026-08-21",
+      "updated_today": false,
+      "last_run": "2026-08-22T07:01:41+00:00",
+      "status": "ok"
+    },
+    {
+      "metric_id": "al_spot_central",
+      "name": "现货·中原",
+      "latest_date": "2026-08-21",
+      "updated_today": false,
+      "last_run": "2026-08-22T07:01:41+00:00",
+      "status": "ok"
+    },
+    {
+      "metric_id": "al_social_inv",
+      "name": "社会库存",
+      "latest_date": "2026-08-20",
+      "updated_today": false,
+      "last_run": "2026-08-22T07:01:41+00:00",
+      "status": "ok"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T07:01:41+00:00",
+  "metric": {
+    "id": "al_spot_south",
+    "name": "现货·华南",
+    "category": "price",
+    "unit": "元/吨"
+  },
+  "points": [
+    {
+      "date": "2026-08-13",
+      "value": 24200.0,
+      "change": null,
+      "src_change": -290.0
+    },
+    {
+      "date": "2026-08-14",
+      "value": 23920.0,
+      "change": -280.0,
+      "src_change": -280.0
+    },
+    {
+      "date": "2026-08-17",
+      "value": 24120.0,
+      "change": 200.0,
+      "src_change": 200.0
+    },
+    {
+      "date": "2026-08-18",
+      "value": 24030.0,
+      "change": -90.0,
+      "src_change": -90.0
+    },
+    {
+      "date": "2026-08-19",
+      "value": 23790.0,
+      "change": -240.0,
+      "src_change": -240.0
+    },
+    {
+      "date": "2026-08-20",
+      "value": 23710.0,
+      "change": -80.0,
+      "src_change": -80.0
+    },
+    {
+      "date": "2026-08-21",
+      "value": 23850.0,
+      "change": 140.0,
+      "src_change": 140.0
+    }
+  ]
+}

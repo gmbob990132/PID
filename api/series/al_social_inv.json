@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T07:01:41+00:00",
+  "metric": {
+    "id": "al_social_inv",
+    "name": "社会库存",
+    "category": "inventory",
+    "unit": "万吨"
+  },
+  "points": [
+    {
+      "date": "2026-08-17",
+      "value": 86.3,
+      "change": null,
+      "src_change": -1.3
+    },
+    {
+      "date": "2026-08-20",
+      "value": 84.9,
+      "change": -1.3999999999999915,
+      "src_change": -1.4
+    }
+  ]
+}

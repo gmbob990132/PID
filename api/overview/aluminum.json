@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-22T07:01:41+00:00",
+  "module": "aluminum",
+  "today": "2026-08-22",
+  "metrics": [
+    {
+      "id": "al_spot_east",
+      "name": "现货·华东",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-08-21",
+        "value": 23680.0,
+        "mom": 80.0,
+        "yoy": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T07:01:41+00:00",
+        "status": "ok",
+        "rows_written": 7
+      }
+    },
+    {
+      "id": "al_spot_south",
+      "name": "现货·华南",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-08-21",
+        "value": 23850.0,
+        "mom": 140.0,
+        "yoy": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T07:01:41+00:00",
+        "status": "ok",
+        "rows_written": 7
+      }
+    },
+    {
+      "id": "al_spot_central",
+      "name": "现货·中原",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-08-21",
+        "value": 23620.0,
+        "mom": 90.0,
+        "yoy": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T07:01:41+00:00",
+        "status": "ok",
+        "rows_written": 7
+      }
+    },
+    {
+      "id": "al_social_inv",
+      "name": "社会库存",
+      "category": "inventory",
+      "unit": "万吨",
+      "source_type": "api",
+      "update_freq": "biweekly",
+      "latest": {
+        "date": "2026-08-20",
+        "value": 84.9,
+        "mom": -1.3999999999999915,
+        "yoy": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T07:01:41+00:00",
+        "status": "ok",
+        "rows_written": 2
+      }
+    }
+  ]
+}
