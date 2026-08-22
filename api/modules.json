@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T07:52:09+00:00",
+  "generated_at": "2026-08-22T08:05:55+00:00",
   "modules": [
     {
       "id": "aluminum",
       "name": "电解铝",
       "categories": [
         "price",
-        "inventory"
+        "inventory",
+        "cost"
       ],
       "metrics": [
         {
@@ -53,6 +54,33 @@
           "unit": "元/吨",
           "source_type": "free",
           "source_ref": "akshare_futures_main",
+          "update_freq": "daily"
+        },
+        {
+          "id": "al_alumina_futures",
+          "name": "氧化铝主力",
+          "category": "cost",
+          "unit": "元/吨",
+          "source_type": "free",
+          "source_ref": "akshare_futures_main",
+          "update_freq": "daily"
+        },
+        {
+          "id": "al_lme_price",
+          "name": "LME铝价",
+          "category": "price",
+          "unit": "美元/吨",
+          "source_type": "free",
+          "source_ref": "akshare_foreign_hist",
+          "update_freq": "daily"
+        },
+        {
+          "id": "al_lme_inv",
+          "name": "LME库存",
+          "category": "inventory",
+          "unit": "万吨",
+          "source_type": "free",
+          "source_ref": "akshare_lme_stock",
           "update_freq": "daily"
         }
       ]

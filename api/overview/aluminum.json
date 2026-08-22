@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T07:52:09+00:00",
+  "generated_at": "2026-08-22T08:05:55+00:00",
   "module": "aluminum",
   "today": "2026-08-22",
   "metrics": [
@@ -19,7 +19,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:52:05+00:00",
+        "run_at": "2026-08-22T08:05:44+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -39,7 +39,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:52:05+00:00",
+        "run_at": "2026-08-22T08:05:44+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -59,7 +59,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:52:05+00:00",
+        "run_at": "2026-08-22T08:05:44+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -79,7 +79,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:52:05+00:00",
+        "run_at": "2026-08-22T08:05:44+00:00",
         "status": "ok",
         "rows_written": 2
       }
@@ -99,9 +99,69 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-22T07:52:05+00:00",
+        "run_at": "2026-08-22T08:05:44+00:00",
         "status": "ok",
         "rows_written": 267
+      }
+    },
+    {
+      "id": "al_alumina_futures",
+      "name": "氧化铝主力",
+      "category": "cost",
+      "unit": "元/吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-08-21",
+        "value": 2698.0,
+        "mom": 35.0,
+        "yoy": -426.0
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T08:05:44+00:00",
+        "status": "ok",
+        "rows_written": 267
+      }
+    },
+    {
+      "id": "al_lme_price",
+      "name": "LME铝价",
+      "category": "price",
+      "unit": "美元/吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-08-21",
+        "value": 3242.0,
+        "mom": 56.5,
+        "yoy": 650.5
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T08:05:44+00:00",
+        "status": "ok",
+        "rows_written": 2538
+      }
+    },
+    {
+      "id": "al_lme_inv",
+      "name": "LME库存",
+      "category": "inventory",
+      "unit": "万吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "latest": {
+        "date": "2026-07-17",
+        "value": 28.01,
+        "mom": -0.14999999999999858,
+        "yoy": -14.709999999999997
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-08-22T08:05:44+00:00",
+        "status": "ok",
+        "rows_written": 2717
       }
     }
   ]
