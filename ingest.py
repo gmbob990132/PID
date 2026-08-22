@@ -37,6 +37,15 @@ METRICS = [
     {"id": "al_futures_main", "name": "沪铝主力", "category": "price", "unit": "元/吨",
      "source_type": "free", "source_ref": "akshare_futures_main", "update_freq": "daily",
      "params": {"symbol": "AL0"}},
+    {"id": "al_alumina_futures", "name": "氧化铝主力", "category": "cost", "unit": "元/吨",
+     "source_type": "free", "source_ref": "akshare_futures_main", "update_freq": "daily",
+     "params": {"symbol": "AO0"}},
+    {"id": "al_lme_price", "name": "LME铝价", "category": "price", "unit": "美元/吨",
+     "source_type": "free", "source_ref": "akshare_foreign_hist", "update_freq": "daily",
+     "params": {"symbol": "AHD"}},
+    {"id": "al_lme_inv", "name": "LME库存", "category": "inventory", "unit": "万吨",
+     "source_type": "free", "source_ref": "akshare_lme_stock", "update_freq": "daily",
+     "params": {"metal": "铝"}},
 ]
 
 _MY_URL = ("https://openapi.mysteel.com/without_sign/newsflash/flashnews/query_by_tags.htm"
@@ -130,13 +139,13 @@ def adapter_mysteel_flash(metrics):
     return obs
 
 
-def _futures_rows_to_obs(df, metric):
+def _price_rows_to_obs(df, metric, source_prefix):
     import pandas as pd
     cols = list(df.columns)
     dcol = "日期" if "日期" in cols else next((c for c in cols if "date" in str(c).lower() or "日期" in str(c)), cols[0])
     ccol = "收盘价" if "收盘价" in cols else next((c for c in cols if "close" in str(c).lower() or "收盘" in str(c)), None)
     if ccol is None:
-        raise ValueError("akshare 返回里找不到收盘价列，列为：" + str(cols))
+        raise ValueError("找不到收盘价/close 列，列为：" + str(cols))
     sym = metric.get("params", {}).get("symbol", "")
     out = []
     for _, r in df.iterrows():
@@ -144,8 +153,7 @@ def _futures_rows_to_obs(df, metric):
         if pd.isna(v):
             continue
         out.append({"metric_id": metric["id"], "obs_date": str(pd.to_datetime(r[dcol]).date()),
-                    "value": float(v), "src_change": None,
-                    "source": "akshare/futures_main_sina/" + sym})
+                    "value": float(v), "src_change": None, "source": source_prefix + sym})
     return out
 
 
@@ -157,13 +165,53 @@ def adapter_akshare_futures_main(metrics):
     out = []
     for m in metrics:
         df = ak.futures_main_sina(symbol=m["params"]["symbol"], start_date=start, end_date="22220101")
-        out += _futures_rows_to_obs(df, m)
+        out += _price_rows_to_obs(df, m, "akshare/futures_main_sina/")
+    return out
+
+
+def adapter_akshare_foreign_hist(metrics):
+    """外盘期货历史（LME 等），如 LME 铝 symbol=AHD。列名 date/close。"""
+    if _SELFTEST:
+        return []
+    import akshare as ak
+    out = []
+    for m in metrics:
+        df = ak.futures_foreign_hist(symbol=m["params"]["symbol"])
+        out += _price_rows_to_obs(df, m, "akshare/futures_foreign_hist/")
+    return out
+
+
+def adapter_akshare_lme_stock(metrics):
+    """LME 库存（宽表，按金属名取列，吨→万吨）。"""
+    if _SELFTEST:
+        return []
+    import akshare as ak
+    import pandas as pd
+    df = ak.macro_euro_lme_stock()
+    cols = list(df.columns)
+    dcol = "日期" if "日期" in cols else next((c for c in cols if "date" in str(c).lower() or "日期" in str(c)), cols[0])
+    out = []
+    for m in metrics:
+        metal = m.get("params", {}).get("metal", "铝")
+        cand = [c for c in cols if metal in str(c)]
+        if not cand:
+            raise ValueError("LME库存找不到['" + metal + "']列，现有列：" + str(cols))
+        col = next((c for c in cand if "库存" in str(c) or "stock" in str(c).lower()), cand[0])
+        for _, r in df.iterrows():
+            v = r[col]
+            if pd.isna(v):
+                continue
+            out.append({"metric_id": m["id"], "obs_date": str(pd.to_datetime(r[dcol]).date()),
+                        "value": round(float(v) / 10000.0, 2), "src_change": None,
+                        "source": "akshare/macro_euro_lme_stock/" + metal})
     return out
 
 
 ADAPTERS = {
     "mysteel_flash": adapter_mysteel_flash,
     "akshare_futures_main": adapter_akshare_futures_main,
+    "akshare_foreign_hist": adapter_akshare_foreign_hist,
+    "akshare_lme_stock": adapter_akshare_lme_stock,
 }
 
 
