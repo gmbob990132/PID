@@ -291,7 +291,7 @@ def adapter_akshare_spot_price_daily(metrics):
     import pandas as pd
     from datetime import date as _date, timedelta as _td
     end = _date.today()
-    start = end - _td(days=10)
+    start = end - _td(days=30)
     out = []
     for m in metrics:
         code = m["params"]["symbol"]
