@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-22T15:41:26+00:00",
+  "generated_at": "2026-08-22T16:15:52+00:00",
   "modules": [
     {
       "id": "aluminum",
@@ -88,8 +88,8 @@
           "name": "氧化铝现货",
           "category": "cost",
           "unit": "元/吨",
-          "source_type": "free",
-          "source_ref": "akshare_spot_price_daily",
+          "source_type": "api",
+          "source_ref": "mysteel_lv_table",
           "update_freq": "daily"
         },
         {
@@ -97,8 +97,8 @@
           "name": "预焙阳极",
           "category": "cost",
           "unit": "元/吨",
-          "source_type": "manual",
-          "source_ref": "manual_csv",
+          "source_type": "api",
+          "source_ref": "mysteel_lv_table",
           "update_freq": "weekly"
         },
         {
