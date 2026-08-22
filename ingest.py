@@ -1,72 +1,91 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-A-1 落库脚本：抓取 Mysteel 电解铝价格/库存 → 写入 SQLite → 记抓取日志。
+落库脚本（B-1：多数据源，适配器注册表 + 调度循环）
+抓取各来源 → 写 SQLite → 记抓取日志。
 
 用法：
-    python3 ingest.py             # 联网抓取今天的数据，写入 data/portfolio.db
-    python3 ingest.py --selftest  # 不联网，用内置真实样本（8/19~8/21）写入 data/selftest.db
+    python3 ingest.py             # 联网抓取，写入 data/portfolio.db
+    python3 ingest.py --selftest  # 不联网，用内置 Mysteel 样本验证（akshare 源跳过）
 
-设计纪律（见设计文档第十一节）：
-  · 时区：obs_date 用北京交易日；ingested_at 用 UTC 时间戳
-  · 溯源：每条观测记 source 与 ingested_at
-  · 幂等：(metric_id, obs_date) 主键 upsert，重复跑结果一致
-  · 配置驱动：模块/指标写在配置里，加指标=加配置
-  · 日志：每个指标每次抓取记一条 ingest_runs，支撑将来的“数据状态”页
-零依赖：仅用 Python 自带库。
+加新数据源 = 写一个 adapter 注册进 ADAPTERS；加指标 = 在 METRICS 加一行。
+Mysteel 路径零依赖；akshare 路径懒加载（仅在有 akshare 指标时才 import）。
 """
 import os
 import re
 import sys
 import json
 import sqlite3
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from urllib.request import Request, urlopen
 
 CN_TZ = timezone(timedelta(hours=8))
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(HERE, "data", "portfolio.db")
+_SELFTEST = False
 
-URL = ("https://openapi.mysteel.com/without_sign/newsflash/flashnews/query_by_tags.htm"
-       "?advertisementFlag=0&keyword=&pageNo=1&pageSize=30&sortByScore=false"
-       "&columnIds=%255B%255B2%252C84%252C584%255D%255D&breedTagId=4437")
-HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
-    "Referer": "https://www.mysteel.com/fastcomment/",
-    "Accept": "application/json, text/plain, */*",
-}
-
-# ---------- 配置：模块与指标（配置驱动，加指标=在这加一行）----------
 MODULE = {"id": "aluminum", "name": "电解铝", "sort_order": 1}
 METRICS = [
-    {"id": "al_spot_east",    "name": "现货·华东", "category": "price",     "unit": "元/吨", "update_freq": "daily"},
-    {"id": "al_spot_south",   "name": "现货·华南", "category": "price",     "unit": "元/吨", "update_freq": "daily"},
-    {"id": "al_spot_central", "name": "现货·中原", "category": "price",     "unit": "元/吨", "update_freq": "daily"},
-    {"id": "al_social_inv",   "name": "社会库存",  "category": "inventory", "unit": "万吨", "update_freq": "biweekly"},
+    {"id": "al_spot_east",    "name": "现货·华东", "category": "price",     "unit": "元/吨",
+     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "daily"},
+    {"id": "al_spot_south",   "name": "现货·华南", "category": "price",     "unit": "元/吨",
+     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "daily"},
+    {"id": "al_spot_central", "name": "现货·中原", "category": "price",     "unit": "元/吨",
+     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "daily"},
+    {"id": "al_social_inv",   "name": "社会库存",  "category": "inventory", "unit": "万吨",
+     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "biweekly"},
+    {"id": "al_futures_main", "name": "沪铝主力", "category": "price", "unit": "元/吨",
+     "source_type": "free", "source_ref": "akshare_futures_main", "update_freq": "daily",
+     "params": {"symbol": "AL0"}},
 ]
-REGION_TO_METRIC = {"华东": "al_spot_east", "华南": "al_spot_south", "中原": "al_spot_central"}
-SOURCE_TYPE, SOURCE_REF, SOURCE_NAME = "api", "mysteel_flash", "mysteel_openapi"
 
-# ---------- 解析（全/半角标点兼容）----------
-_REGION_RE = re.compile(
-    r'(华东|华南|华北|中原|西南|西北|东北)\s*([\d]+(?:\.\d+)?)\s*(?:元/吨)?\s*[，,]\s*'
-    r'(涨|跌|平|持平|稳)\s*([\d]+(?:\.\d+)?)?')
+_MY_URL = ("https://openapi.mysteel.com/without_sign/newsflash/flashnews/query_by_tags.htm"
+           "?advertisementFlag=0&keyword=&pageNo=1&pageSize=30&sortByScore=false"
+           "&columnIds=%255B%255B2%252C84%252C584%255D%255D&breedTagId=4437")
+_MY_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+               "Referer": "https://www.mysteel.com/fastcomment/",
+               "Accept": "application/json, text/plain, */*"}
+_REGION_RE = re.compile(r'(华东|华南|华北|中原|西南|西北|东北)\s*([\d]+(?:\.\d+)?)\s*(?:元/吨)?\s*[，,]\s*'
+                        r'(涨|跌|平|持平|稳)\s*([\d]+(?:\.\d+)?)?')
 _INV_TOTAL_RE = re.compile(r'库存总量为\s*([\d.]+)\s*万吨')
 _INV_CHANGE_RE = re.compile(r'较上期数据\s*(增加|减少|下降|持平)?\s*([\d.]+)?\s*万吨')
+_REGION_TO_METRIC = {"华东": "al_spot_east", "华南": "al_spot_south", "中原": "al_spot_central"}
+
+_MY_SAMPLE = {"data": {"list": [
+    {"content": "8月21日Mysteel铝锭价格行情:华东23680,涨80;华南23850,涨140;中原23620,涨90(单位:元/吨)",
+     "publisherTime": 1787279319755},
+    {"content": "Mysteel库存速递：中国铝锭现货库存总量为84.9万吨，较上期数据减少1.4万吨。",
+     "publisherTime": 1787187503324},
+    {"content": "8月20日Mysteel铝锭价格行情：华东23600，跌70；华南23710，跌80；中原23530，跌60（单位：元/吨）",
+     "publisherTime": 1787192923000},
+    {"content": "8月19日Mysteel铝锭价格行情：华东23670，跌230；华南23790，跌240；中原23590，跌210（单位：元/吨）",
+     "publisherTime": 1787106523000},
+]}}
 
 
-def _ts_to_cn_date(ms):
-    return datetime.fromtimestamp(ms / 1000, tz=CN_TZ).date().isoformat()
+def _find_items(obj):
+    if isinstance(obj, list):
+        if obj and isinstance(obj[0], dict) and 'content' in obj[0]:
+            return obj
+        for x in obj:
+            r = _find_items(x)
+            if r:
+                return r
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            r = _find_items(v)
+            if r:
+                return r
+    return None
 
 
-def parse_flash(content, obs_date):
-    """一条快讯 → [(metric_id, value, src_change), ...]"""
+def _parse_flash(content, obs_date):
     out = []
     if '铝锭价格行情' in content:
         for region, price, direction, amt in _REGION_RE.findall(content):
-            mid = REGION_TO_METRIC.get(region)
-            if not mid:                      # 未配置的地区（如华北）直接跳过——配置驱动
+            mid = _REGION_TO_METRIC.get(region)
+            if not mid:
                 continue
             chg = float(amt) if amt else 0.0
             if direction == '跌':
@@ -89,46 +108,65 @@ def parse_flash(content, obs_date):
     return out
 
 
-# ---------- 采集适配器（返回观测列表；将来加源=加一个这样的函数）----------
-def _find_items(obj):
-    if isinstance(obj, list):
-        if obj and isinstance(obj[0], dict) and 'content' in obj[0]:
-            return obj
-        for x in obj:
-            r = _find_items(x)
-            if r:
-                return r
-    elif isinstance(obj, dict):
-        for v in obj.values():
-            r = _find_items(v)
-            if r:
-                return r
-    return None
-
-
-def adapter_mysteel_flash(raw_json):
-    """把接口返回解析成观测：[{metric_id, obs_date, value, src_change, source}]"""
-    items = _find_items(raw_json)
+def adapter_mysteel_flash(metrics):
+    if _SELFTEST:
+        raw = _MY_SAMPLE
+    else:
+        req = Request(_MY_URL, headers=_MY_HEADERS)
+        with urlopen(req, timeout=20) as resp:
+            raw = json.loads(resp.read().decode('utf-8'))
+    items = _find_items(raw)
     if items is None:
-        raise ValueError("返回里找不到 content 列表，接口结构可能变了")
+        raise ValueError("Mysteel 返回里找不到 content 列表，接口结构可能变了")
     obs = []
     for it in items:
         content = it.get('content', '')
         ms = it.get('publisherTime')
-        obs_date = _ts_to_cn_date(ms) if ms else datetime.now(CN_TZ).date().isoformat()
-        for metric_id, value, src_change in parse_flash(content, obs_date):
-            obs.append({"metric_id": metric_id, "obs_date": obs_date,
-                        "value": value, "src_change": src_change, "source": SOURCE_NAME})
+        d = datetime.fromtimestamp(ms / 1000, tz=CN_TZ).date().isoformat() if ms \
+            else datetime.now(CN_TZ).date().isoformat()
+        for metric_id, value, src_change in _parse_flash(content, d):
+            obs.append({"metric_id": metric_id, "obs_date": d, "value": value,
+                        "src_change": src_change, "source": "mysteel_openapi"})
     return obs
 
 
-def fetch_raw():
-    req = Request(URL, headers=HEADERS)
-    with urlopen(req, timeout=20) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+def _futures_rows_to_obs(df, metric):
+    import pandas as pd
+    cols = list(df.columns)
+    dcol = "日期" if "日期" in cols else next((c for c in cols if "date" in str(c).lower() or "日期" in str(c)), cols[0])
+    ccol = "收盘价" if "收盘价" in cols else next((c for c in cols if "close" in str(c).lower() or "收盘" in str(c)), None)
+    if ccol is None:
+        raise ValueError("akshare 返回里找不到收盘价列，列为：" + str(cols))
+    sym = metric.get("params", {}).get("symbol", "")
+    out = []
+    for _, r in df.iterrows():
+        v = r[ccol]
+        if pd.isna(v):
+            continue
+        out.append({"metric_id": metric["id"], "obs_date": str(pd.to_datetime(r[dcol]).date()),
+                    "value": float(v), "src_change": None,
+                    "source": "akshare/futures_main_sina/" + sym})
+    return out
 
 
-# ---------- 数据库 ----------
+def adapter_akshare_futures_main(metrics):
+    if _SELFTEST:
+        return []
+    import akshare as ak
+    start = (date.today() - timedelta(days=400)).strftime("%Y%m%d")
+    out = []
+    for m in metrics:
+        df = ak.futures_main_sina(symbol=m["params"]["symbol"], start_date=start, end_date="22220101")
+        out += _futures_rows_to_obs(df, m)
+    return out
+
+
+ADAPTERS = {
+    "mysteel_flash": adapter_mysteel_flash,
+    "akshare_futures_main": adapter_akshare_futures_main,
+}
+
+
 def init_db(conn):
     conn.executescript("""
     CREATE TABLE IF NOT EXISTS modules(
@@ -145,7 +183,6 @@ def init_db(conn):
       id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT, metric_id TEXT,
       run_at TEXT, status TEXT, rows_written INTEGER DEFAULT 0, message TEXT);
     """)
-    # 配置 upsert（幂等）
     conn.execute("INSERT INTO modules(id,name,sort_order) VALUES(?,?,?) "
                  "ON CONFLICT(id) DO UPDATE SET name=excluded.name",
                  (MODULE["id"], MODULE["name"], MODULE["sort_order"]))
@@ -153,103 +190,85 @@ def init_db(conn):
         conn.execute(
             "INSERT INTO metrics(id,module_id,name,category,unit,source_type,source_ref,update_freq,sort_order) "
             "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
-            "name=excluded.name, unit=excluded.unit, category=excluded.category",
+            "name=excluded.name, unit=excluded.unit, category=excluded.category, "
+            "source_type=excluded.source_type, source_ref=excluded.source_ref",
             (m["id"], MODULE["id"], m["name"], m["category"], m["unit"],
-             SOURCE_TYPE, SOURCE_REF, m["update_freq"], i))
+             m["source_type"], m["source_ref"], m["update_freq"], i))
     conn.commit()
 
 
-def upsert_observation(conn, o, now_utc):
-    conn.execute(
-        "INSERT INTO observations(metric_id,obs_date,value,src_change,source,status,ingested_at) "
-        "VALUES(?,?,?,?,?,'ok',?) ON CONFLICT(metric_id,obs_date) DO UPDATE SET "
-        "value=excluded.value, src_change=excluded.src_change, "
-        "source=excluded.source, ingested_at=excluded.ingested_at",
-        (o["metric_id"], o["obs_date"], o["value"], o["src_change"], o["source"], now_utc))
-
-
-def log_run(conn, metric_id, status, rows, msg, now_utc):
-    conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
-                 "VALUES(?,?,?,?,?,?)", (SOURCE_REF, metric_id, now_utc, status, rows, msg))
-
-
-def run(db_path, raw_json):
+def run(db_path):
     now_utc = datetime.now(timezone.utc).isoformat(timespec="seconds")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
         init_db(conn)
-        try:
-            obs = adapter_mysteel_flash(raw_json)
-        except Exception as e:
-            for m in METRICS:
-                log_run(conn, m["id"], "failed", 0, str(e), now_utc)
-            conn.commit()
-            print(f"!! 采集/解析失败：{e}")
-            return 2
-
-        by_metric = {}
-        for o in obs:
-            upsert_observation(conn, o, now_utc)
-            by_metric.setdefault(o["metric_id"], []).append(o)
-
-        # 每个配置指标记一条日志（有数据=ok，没数据=no_data）
+        groups = {}
         for m in METRICS:
-            got = by_metric.get(m["id"], [])
-            if got:
-                dates = ",".join(sorted(x["obs_date"] for x in got))
-                log_run(conn, m["id"], "ok", len(got), f"dates={dates}", now_utc)
-            else:
-                log_run(conn, m["id"], "no_data", 0, "本次无该指标快讯", now_utc)
+            if m.get("active", 1):
+                groups.setdefault(m["source_ref"], []).append(m)
+
+        all_by_metric = {}
+        for source_ref, ms in groups.items():
+            adapter = ADAPTERS.get(source_ref)
+            if not adapter:
+                for m in ms:
+                    conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
+                                 "VALUES(?,?,?,?,?,?)", (source_ref, m["id"], now_utc, "failed", 0, "无对应adapter"))
+                continue
+            try:
+                obs = adapter(ms)
+            except Exception as e:
+                print(f"!! [{source_ref}] 失败：{e}")
+                for m in ms:
+                    conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
+                                 "VALUES(?,?,?,?,?,?)", (source_ref, m["id"], now_utc, "failed", 0, str(e)[:200]))
+                continue
+            grp_by_metric = {}
+            for o in obs:
+                conn.execute(
+                    "INSERT INTO observations(metric_id,obs_date,value,src_change,source,status,ingested_at) "
+                    "VALUES(?,?,?,?,?,'ok',?) ON CONFLICT(metric_id,obs_date) DO UPDATE SET "
+                    "value=excluded.value, src_change=excluded.src_change, "
+                    "source=excluded.source, ingested_at=excluded.ingested_at",
+                    (o["metric_id"], o["obs_date"], o["value"], o["src_change"], o["source"], now_utc))
+                grp_by_metric.setdefault(o["metric_id"], []).append(o)
+            for m in ms:
+                got = grp_by_metric.get(m["id"], [])
+                st = "ok" if got else "no_data"
+                msg = ("dates=" + ",".join(sorted(x["obs_date"] for x in got)[-3:])) if got else "本次无该指标数据"
+                conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
+                             "VALUES(?,?,?,?,?,?)", (source_ref, m["id"], now_utc, st, len(got), msg))
+                all_by_metric[m["id"]] = got
         conn.commit()
 
-        # 屏幕反馈
         today = datetime.now(CN_TZ).date().isoformat()
-        print(f"[{datetime.now(CN_TZ):%Y-%m-%d %H:%M} CST] 写入完成 → {db_path}\n")
+        print(f"[{datetime.now(CN_TZ):%Y-%m-%d %H:%M} CST] 写入完成 -> {db_path}\n")
         for m in METRICS:
-            got = sorted(by_metric.get(m["id"], []), key=lambda x: x["obs_date"])
+            got = sorted(all_by_metric.get(m["id"], []), key=lambda x: x["obs_date"])
             if got:
                 latest = got[-1]
                 tag = "（今日）" if latest["obs_date"] == today else f"（{latest['obs_date']}）"
-                unit = m["unit"]
-                print(f"  ✓ {m['name']:<8}{latest['value']:.1f} {unit} "
-                      f"({latest['src_change']:+.1f}) {tag}  本次写入 {len(got)} 天")
+                chg = "" if latest["src_change"] is None else f" ({latest['src_change']:+.1f})"
+                print(f"  OK {m['name']:<8}{latest['value']:.1f} {m['unit']}{chg} {tag}  写入 {len(got)} 天")
             else:
-                print(f"  · {m['name']:<8}本次无数据")
+                print(f"  -- {m['name']:<8}本次无数据")
         return 0
     finally:
         conn.close()
 
 
-# 内置真实样本（你这一路贴过的真实快讯：8/19~8/21 价格 + 8/20 库存）
-SAMPLE = {"data": {"list": [
-    {"content": "8月21日Mysteel铝锭价格行情:华东23680,涨80;华南23850,涨140;中原23620,涨90(单位:元/吨)",
-     "publisherTime": 1787279319755},
-    {"content": "Mysteel库存速递：中国铝锭现货库存总量为84.9万吨，较上期数据减少1.4万吨。",
-     "publisherTime": 1787187503324},
-    {"content": "8月20日Mysteel铝锭价格行情：华东23600，跌70；华南23710，跌80；中原23530，跌60（单位：元/吨）",
-     "publisherTime": 1787192923000},
-    {"content": "8月19日Mysteel铝锭价格行情：华东23670，跌230；华南23790，跌240；中原23590，跌210（单位：元/吨）",
-     "publisherTime": 1787106523000},
-    {"content": "8月20日Mysteel铝棒加工费行情：山东500，涨20", "publisherTime": 1787192000000},
-]}}
-
-
 def main():
+    global _SELFTEST
     if '--selftest' in sys.argv:
+        _SELFTEST = True
         db = os.path.join(HERE, "data", "selftest.db")
         if os.path.exists(db):
             os.remove(db)
-        print("[自测] 用内置真实样本（8/19~8/21）写入独立库，不联网\n")
-        sys.exit(run(db, SAMPLE))
-
-    print(f"[{datetime.now(CN_TZ):%Y-%m-%d %H:%M} CST] 请求 Mysteel 接口 …")
-    try:
-        raw = fetch_raw()
-    except Exception as e:
-        print(f"!! 请求失败：{e}\n   可稍后重试，或先 python3 ingest.py --selftest 验证逻辑。")
-        sys.exit(1)
-    sys.exit(run(DB_PATH, raw))
+        print("[自测] Mysteel 用内置样本，akshare 源跳过（离线）\n")
+        sys.exit(run(db))
+    print(f"[{datetime.now(CN_TZ):%Y-%m-%d %H:%M} CST] 开始抓取 …")
+    sys.exit(run(DB_PATH))
 
 
 if __name__ == '__main__':
