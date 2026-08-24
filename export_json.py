@@ -74,11 +74,12 @@ def export(db_path, out_dir):
 
     for mod in modules:
         metrics = conn.execute(
-            "SELECT id,name,category,unit,source_type,source_ref,update_freq "
+            "SELECT id,name,category,unit,source_type,source_ref,update_freq,"
+            "hide_overview,hide_chart "
             "FROM metrics WHERE module_id=? AND active=1 ORDER BY sort_order",
             (mod["id"],)).fetchall()
 
-        # modules.json 里带指标定义（前端据此画 tab / 子tab / 卡）
+        # modules.json 里带指标定义（前端据此画 tab / 子tab / 卡；hide_chart 控制图上是否画）
         cats = []
         for m in metrics:
             if m["category"] not in cats:
@@ -87,7 +88,9 @@ def export(db_path, out_dir):
             "id": mod["id"], "name": mod["name"], "categories": cats,
             "metrics": [{"id": m["id"], "name": m["name"], "category": m["category"],
                          "unit": m["unit"], "source_type": m["source_type"],
-                         "source_ref": m["source_ref"], "update_freq": m["update_freq"]}
+                         "source_ref": m["source_ref"], "update_freq": m["update_freq"],
+                         "hide_overview": bool(m["hide_overview"]),
+                         "hide_chart": bool(m["hide_chart"])}
                         for m in metrics],
         })
 
@@ -98,14 +101,18 @@ def export(db_path, out_dir):
             yoy = yoy_row["yoy"] if yoy_row else None
             li = _last_ingest(conn, m["id"])
 
-            # series 文件：图用 date+value，表用 change(自算环比)
+            # series：拆两份——近端小文件(默认1月，load快) + 全量文件(点长区间时才取)
             points = [{"date": r["obs_date"], "value": r["value"],
                        "change": r["mom"], "src_change": r["src_change"]} for r in rows]
+            meta = {"id": m["id"], "name": m["name"], "category": m["category"], "unit": m["unit"]}
+            recent = points[-31:]          # 近约1个月
             _write(os.path.join(out_dir, "series", f"{m['id']}.json"), {
                 "schema_version": SCHEMA_VERSION, "generated_at": gen,
-                "metric": {"id": m["id"], "name": m["name"], "category": m["category"],
-                           "unit": m["unit"]},
-                "points": points,
+                "metric": meta, "range": "recent", "points": recent,
+            })
+            _write(os.path.join(out_dir, "series", f"{m['id']}.full.json"), {
+                "schema_version": SCHEMA_VERSION, "generated_at": gen,
+                "metric": meta, "range": "full", "points": points,
             })
 
             latest = rows[-1] if rows else None
@@ -120,6 +127,7 @@ def export(db_path, out_dir):
             overview_metrics.append({
                 "id": m["id"], "name": m["name"], "category": m["category"], "unit": m["unit"],
                 "source_type": m["source_type"], "update_freq": m["update_freq"],
+                "hide_overview": bool(m["hide_overview"]), "hide_chart": bool(m["hide_chart"]),
                 "latest": None if not latest else {
                     "date": latest["obs_date"], "value": latest["value"],
                     "mom": latest["mom"], "yoy": yoy,

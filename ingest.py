@@ -42,18 +42,22 @@ METRICS = [
      "params": {"symbol": "AO0"}},
     {"id": "al_lme_price", "name": "LME铝价", "category": "price", "unit": "美元/吨",
      "source_type": "free", "source_ref": "akshare_foreign_hist", "update_freq": "daily",
-     "params": {"symbol": "AHD"}},
+     "hide_chart": True, "params": {"symbol": "AHD"}},
     {"id": "al_lme_inv", "name": "LME库存", "category": "inventory", "unit": "万吨",
      "source_type": "free", "source_ref": "akshare_lme_stock", "update_freq": "daily",
      "params": {"metal": "铝"}},
+    {"id": "al_ingot_a00", "name": "A00铝锭", "category": "price", "unit": "元/吨",
+     "source_type": "api", "source_ref": "mysteel_lv_table", "update_freq": "daily",
+     "params": {"name": "A00铝锭", "region": "无锡"}},
     {"id": "al_alumina_spot", "name": "氧化铝现货", "category": "cost", "unit": "元/吨",
      "source_type": "api", "source_ref": "mysteel_lv_table", "update_freq": "daily",
      "params": {"name": "氧化铝"}},
     {"id": "al_anode", "name": "预焙阳极", "category": "cost", "unit": "元/吨",
      "source_type": "api", "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "预焙阳极"}},
+     "hide_chart": True, "params": {"name": "预焙阳极"}},
     {"id": "al_spot_premium", "name": "现货升贴水", "category": "price", "unit": "元/吨",
      "source_type": "derived", "source_ref": "derived", "update_freq": "daily",
+     "hide_overview": True, "hide_chart": True,
      "params": {"formula": "spot_minus_futures", "minuend": "al_spot_east", "subtrahend": "al_futures_main"}},
 ]
 
@@ -402,7 +406,8 @@ def init_db(conn):
     CREATE TABLE IF NOT EXISTS metrics(
       id TEXT PRIMARY KEY, module_id TEXT NOT NULL, name TEXT NOT NULL, category TEXT NOT NULL,
       unit TEXT, source_type TEXT, source_ref TEXT, update_freq TEXT,
-      sort_order INTEGER DEFAULT 0, active INTEGER DEFAULT 1);
+      sort_order INTEGER DEFAULT 0, active INTEGER DEFAULT 1,
+      hide_overview INTEGER DEFAULT 0, hide_chart INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS observations(
       metric_id TEXT NOT NULL, obs_date TEXT NOT NULL, value REAL NOT NULL,
       src_change REAL, source TEXT, status TEXT DEFAULT 'ok', ingested_at TEXT,
@@ -411,17 +416,26 @@ def init_db(conn):
       id INTEGER PRIMARY KEY AUTOINCREMENT, source TEXT, metric_id TEXT,
       run_at TEXT, status TEXT, rows_written INTEGER DEFAULT 0, message TEXT);
     """)
+    # 老库平滑升级：补列（已存在则忽略）
+    for col in ("hide_overview", "hide_chart"):
+        try:
+            conn.execute(f"ALTER TABLE metrics ADD COLUMN {col} INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
     conn.execute("INSERT INTO modules(id,name,sort_order) VALUES(?,?,?) "
                  "ON CONFLICT(id) DO UPDATE SET name=excluded.name",
                  (MODULE["id"], MODULE["name"], MODULE["sort_order"]))
     for i, m in enumerate(METRICS):
         conn.execute(
-            "INSERT INTO metrics(id,module_id,name,category,unit,source_type,source_ref,update_freq,sort_order) "
-            "VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+            "INSERT INTO metrics(id,module_id,name,category,unit,source_type,source_ref,update_freq,"
+            "sort_order,hide_overview,hide_chart) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
             "name=excluded.name, unit=excluded.unit, category=excluded.category, "
-            "source_type=excluded.source_type, source_ref=excluded.source_ref",
+            "source_type=excluded.source_type, source_ref=excluded.source_ref, "
+            "hide_overview=excluded.hide_overview, hide_chart=excluded.hide_chart",
             (m["id"], MODULE["id"], m["name"], m["category"], m["unit"],
-             m["source_type"], m["source_ref"], m["update_freq"], i))
+             m["source_type"], m["source_ref"], m["update_freq"], i,
+             1 if m.get("hide_overview") else 0, 1 if m.get("hide_chart") else 0))
     conn.commit()
 
 

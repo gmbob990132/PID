@@ -99,7 +99,7 @@ const RANGES = [["1m","近1月",30],["6m","近6月",180],["1y","近1年",365],["
 const SERIES_COLORS = ["#2a6fdb","#1d9e75","#ba7517","#8a5cd1","#d4537e"];
 
 let MODULES = [];         // modules.json
-let curMod = null, curSub = null, curRange = "6m";
+let curMod = null, curSub = null, curRange = "1m";
 let chart = null;
 
 function sourceLabel(m){
@@ -178,7 +178,7 @@ async function renderPane(){
 async function renderOverview(pane){
   const ov = await loadJSON("api/overview/"+curMod+".json");
   const byCat={};
-  ov.metrics.forEach(m=>{ (byCat[m.category]=byCat[m.category]||[]).push(m); });
+  ov.metrics.forEach(m=>{ if(m.hide_overview) return; (byCat[m.category]=byCat[m.category]||[]).push(m); });
   let html="";
   CAT_ORDER.filter(c=>byCat[c]).forEach(c=>{
     html += '<div class="grp-title">'+(CAT_NAME[c]||c)+'</div><div class="grid">';
@@ -215,11 +215,13 @@ async function renderCategory(pane, cat){
   pane.innerHTML=html;
   pane.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ curRange=el.dataset.r; renderCategory(pane,cat); });
 
-  // 载入各指标序列
+  // 按需加载：近1月用小文件(recent，load快)，更长区间才取全量文件(full)
+  const useFull = (curRange !== "1m");
   const seriesData = {};
   for(const m of metrics){
-    const s = await loadJSON("api/series/"+m.id+".json");
-    seriesData[m.id] = s.points || [];
+    const url = "api/series/"+m.id+(useFull?".full":"")+".json";
+    const s = await loadCached(url);
+    seriesData[m.id] = (s && s.points) || [];
   }
   const cutoff = rangeCutoff(curRange);
   const dp = metrics[0] && metrics[0].unit==="万吨"?1:0;
@@ -229,8 +231,17 @@ async function renderCategory(pane, cat){
   metrics.forEach(m=> seriesData[m.id].forEach(p=>{ if(!cutoff||p.date>=cutoff) dateSet.add(p.date); }));
   const dates=[...dateSet].sort();
 
-  drawChart(metrics, seriesData, dates, dp);
-  drawTable(metrics, seriesData, dates, dp);
+  const chartMetrics = metrics.filter(m=> !m.hide_chart);  // 图上不画 hide_chart 的指标
+  drawChart(chartMetrics, seriesData, dates, dp);
+  drawTable(metrics, seriesData, dates, dp);               // 表格保留全部（含未上图的）
+}
+
+const _seriesCache = {};
+async function loadCached(url){
+  if(url in _seriesCache) return _seriesCache[url];
+  const v = await loadJSON(url);
+  _seriesCache[url] = v;
+  return v;
 }
 
 function rangeCutoff(k){
