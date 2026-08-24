@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-24T03:56:16+00:00",
+  "generated_at": "2026-08-24T06:17:16+00:00",
   "module": "aluminum",
   "today": "2026-08-24",
   "metrics": [
@@ -11,6 +11,8 @@
       "unit": "元/吨",
       "source_type": "api",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-24",
         "value": 23800.0,
@@ -21,7 +23,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -33,6 +35,8 @@
       "unit": "元/吨",
       "source_type": "api",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-24",
         "value": 23960.0,
@@ -43,7 +47,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -55,6 +59,8 @@
       "unit": "元/吨",
       "source_type": "api",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-24",
         "value": 23740.0,
@@ -65,7 +71,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -77,6 +83,8 @@
       "unit": "万吨",
       "source_type": "api",
       "update_freq": "biweekly",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-24",
         "value": 83.5,
@@ -87,7 +95,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 3
       }
@@ -99,6 +107,8 @@
       "unit": "元/吨",
       "source_type": "free",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-21",
         "value": 23710.0,
@@ -109,7 +119,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 266
       }
@@ -121,6 +131,8 @@
       "unit": "元/吨",
       "source_type": "free",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-21",
         "value": 2698.0,
@@ -131,7 +143,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 266
       }
@@ -143,17 +155,19 @@
       "unit": "美元/吨",
       "source_type": "free",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": true,
       "latest": {
         "date": "2026-08-24",
-        "value": 3245.5,
-        "mom": 3.5,
-        "yoy": 625.0,
+        "value": 3241.0,
+        "mom": -1.0,
+        "yoy": 620.5,
         "src_change": null,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 2537
       }
@@ -165,6 +179,8 @@
       "unit": "万吨",
       "source_type": "free",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-07-17",
         "value": 28.01,
@@ -175,7 +191,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 2717
       }
@@ -187,6 +203,8 @@
       "unit": "元/吨",
       "source_type": "api",
       "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
       "latest": {
         "date": "2026-08-24",
         "value": 2720.0,
@@ -197,7 +215,31 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
+        "status": "ok",
+        "rows_written": 1
+      }
+    },
+    {
+      "id": "al_ingot_a00",
+      "name": "A00铝锭",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-08-24",
+        "value": 23800.0,
+        "mom": null,
+        "yoy": null,
+        "src_change": 120.0,
+        "region": "无锡"
+      },
+      "updated_today": true,
+      "last_ingest": {
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -209,6 +251,8 @@
       "unit": "元/吨",
       "source_type": "api",
       "update_freq": "weekly",
+      "hide_overview": false,
+      "hide_chart": true,
       "latest": {
         "date": "2026-08-24",
         "value": 5780.0,
@@ -219,7 +263,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -231,6 +275,8 @@
       "unit": "元/吨",
       "source_type": "derived",
       "update_freq": "daily",
+      "hide_overview": true,
+      "hide_chart": true,
       "latest": {
         "date": "2026-08-21",
         "value": -30.0,
@@ -241,7 +287,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:56:04+00:00",
+        "run_at": "2026-08-24T06:15:02+00:00",
         "status": "ok",
         "rows_written": 7
       }

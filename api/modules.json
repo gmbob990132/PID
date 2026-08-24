@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-24T03:56:16+00:00",
+  "generated_at": "2026-08-24T06:17:16+00:00",
   "modules": [
     {
       "id": "aluminum",
@@ -18,7 +18,9 @@
           "unit": "元/吨",
           "source_type": "api",
           "source_ref": "mysteel_flash",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_spot_south",
@@ -27,7 +29,9 @@
           "unit": "元/吨",
           "source_type": "api",
           "source_ref": "mysteel_flash",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_spot_central",
@@ -36,7 +40,9 @@
           "unit": "元/吨",
           "source_type": "api",
           "source_ref": "mysteel_flash",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_social_inv",
@@ -45,7 +51,9 @@
           "unit": "万吨",
           "source_type": "api",
           "source_ref": "mysteel_flash",
-          "update_freq": "biweekly"
+          "update_freq": "biweekly",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_futures_main",
@@ -54,7 +62,9 @@
           "unit": "元/吨",
           "source_type": "free",
           "source_ref": "akshare_futures_main",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_alumina_futures",
@@ -63,7 +73,9 @@
           "unit": "元/吨",
           "source_type": "free",
           "source_ref": "akshare_futures_main",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_lme_price",
@@ -72,7 +84,9 @@
           "unit": "美元/吨",
           "source_type": "free",
           "source_ref": "akshare_foreign_hist",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": true
         },
         {
           "id": "al_lme_inv",
@@ -81,7 +95,9 @@
           "unit": "万吨",
           "source_type": "free",
           "source_ref": "akshare_lme_stock",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_alumina_spot",
@@ -90,7 +106,20 @@
           "unit": "元/吨",
           "source_type": "api",
           "source_ref": "mysteel_lv_table",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
+        },
+        {
+          "id": "al_ingot_a00",
+          "name": "A00铝锭",
+          "category": "price",
+          "unit": "元/吨",
+          "source_type": "api",
+          "source_ref": "mysteel_lv_table",
+          "update_freq": "daily",
+          "hide_overview": false,
+          "hide_chart": false
         },
         {
           "id": "al_anode",
@@ -99,7 +128,9 @@
           "unit": "元/吨",
           "source_type": "api",
           "source_ref": "mysteel_lv_table",
-          "update_freq": "weekly"
+          "update_freq": "weekly",
+          "hide_overview": false,
+          "hide_chart": true
         },
         {
           "id": "al_spot_premium",
@@ -108,7 +139,9 @@
           "unit": "元/吨",
           "source_type": "derived",
           "source_ref": "derived",
-          "update_freq": "daily"
+          "update_freq": "daily",
+          "hide_overview": true,
+          "hide_chart": true
         }
       ]
     }

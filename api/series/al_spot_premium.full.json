@@ -7,7 +7,7 @@
     "category": "price",
     "unit": "元/吨"
   },
-  "range": "recent",
+  "range": "full",
   "points": [
     {
       "date": "2026-08-13",
