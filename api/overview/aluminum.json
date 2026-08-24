@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-24T03:47:51+00:00",
+  "generated_at": "2026-08-24T03:56:16+00:00",
   "module": "aluminum",
   "today": "2026-08-24",
   "metrics": [
@@ -21,7 +21,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -43,7 +43,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -65,7 +65,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -87,7 +87,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 3
       }
@@ -109,7 +109,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 266
       }
@@ -131,7 +131,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 266
       }
@@ -145,15 +145,15 @@
       "update_freq": "daily",
       "latest": {
         "date": "2026-08-24",
-        "value": 3240.5,
-        "mom": -1.5,
-        "yoy": 620.0,
+        "value": 3245.5,
+        "mom": 3.5,
+        "yoy": 625.0,
         "src_change": null,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 2537
       }
@@ -175,7 +175,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 2717
       }
@@ -197,7 +197,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -219,7 +219,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -241,7 +241,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-24T03:47:40+00:00",
+        "run_at": "2026-08-24T03:56:04+00:00",
         "status": "ok",
         "rows_written": 7
       }
