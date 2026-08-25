@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-24T06:17:16+00:00",
+  "generated_at": "2026-08-25T03:02:49+00:00",
   "metric": {
     "id": "al_alumina_futures",
     "name": "氧化铝主力",
@@ -9,12 +9,6 @@
   },
   "range": "recent",
   "points": [
-    {
-      "date": "2026-07-10",
-      "value": 2715.0,
-      "change": -5.0,
-      "src_change": null
-    },
     {
       "date": "2026-07-13",
       "value": 2678.0,
@@ -193,6 +187,12 @@
       "date": "2026-08-21",
       "value": 2698.0,
       "change": 35.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-24",
+      "value": 2690.0,
+      "change": -8.0,
       "src_change": null
     }
   ]
