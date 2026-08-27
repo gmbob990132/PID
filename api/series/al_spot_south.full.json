@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-26T03:10:03+00:00",
+  "generated_at": "2026-08-27T12:40:17+00:00",
   "metric": {
     "id": "al_spot_south",
     "name": "现货·华南",
@@ -68,6 +68,12 @@
       "value": 24130.0,
       "change": 230.0,
       "src_change": 230.0
+    },
+    {
+      "date": "2026-08-27",
+      "value": 24160.0,
+      "change": 30.0,
+      "src_change": 30.0
     }
   ]
 }
