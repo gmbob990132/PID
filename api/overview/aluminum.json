@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-30T08:06:12+00:00",
+  "generated_at": "2026-08-31T08:25:25+00:00",
   "module": "aluminum",
-  "today": "2026-08-30",
+  "today": "2026-08-31",
   "metrics": [
     {
       "id": "al_spot_east",
@@ -14,16 +14,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-28",
-        "value": 23900.0,
-        "mom": -20.0,
+        "date": "2026-08-31",
+        "value": 23970.0,
+        "mom": 70.0,
         "yoy": null,
-        "src_change": -20.0,
+        "src_change": 70.0,
         "region": null
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -38,16 +38,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-28",
-        "value": 24110.0,
-        "mom": -50.0,
+        "date": "2026-08-31",
+        "value": 24170.0,
+        "mom": 60.0,
         "yoy": null,
-        "src_change": -50.0,
+        "src_change": 60.0,
         "region": null
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -62,16 +62,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-28",
-        "value": 23780.0,
-        "mom": -40.0,
+        "date": "2026-08-31",
+        "value": 23850.0,
+        "mom": 70.0,
         "yoy": null,
-        "src_change": -40.0,
+        "src_change": 70.0,
         "region": null
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 7
       }
@@ -86,16 +86,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-27",
-        "value": 82.1,
-        "mom": -1.4000000000000057,
+        "date": "2026-08-31",
+        "value": 80.9,
+        "mom": -1.1999999999999886,
         "yoy": null,
-        "src_change": -1.4,
+        "src_change": -1.2,
         "region": null
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 3
       }
@@ -119,7 +119,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 266
       }
@@ -134,18 +134,18 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-28",
-        "value": 2648.0,
-        "mom": 34.0,
-        "yoy": -415.0,
+        "date": "2026-08-31",
+        "value": 2687.0,
+        "mom": 39.0,
+        "yoy": -349.0,
         "src_change": null,
         "region": null
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
-        "rows_written": 266
+        "rows_written": 267
       }
     },
     {
@@ -167,9 +167,9 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
-        "rows_written": 2538
+        "rows_written": 2537
       }
     },
     {
@@ -191,7 +191,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 2717
       }
@@ -206,16 +206,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-28",
+        "date": "2026-08-31",
         "value": 2715.0,
-        "mom": -5.0,
+        "mom": 0.0,
         "yoy": null,
-        "src_change": -5.0,
+        "src_change": 0.0,
         "region": "山西"
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -230,16 +230,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-08-28",
-        "value": 23900.0,
-        "mom": -20.0,
+        "date": "2026-08-31",
+        "value": 23980.0,
+        "mom": 80.0,
         "yoy": null,
-        "src_change": -20.0,
+        "src_change": 80.0,
         "region": "无锡"
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -254,16 +254,16 @@
       "hide_overview": false,
       "hide_chart": true,
       "latest": {
-        "date": "2026-08-28",
+        "date": "2026-08-31",
         "value": 5780.0,
         "mom": 0.0,
         "yoy": null,
         "src_change": 0.0,
         "region": "山东"
       },
-      "updated_today": false,
+      "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -287,7 +287,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-08-30T08:05:56+00:00",
+        "run_at": "2026-08-31T08:25:14+00:00",
         "status": "ok",
         "rows_written": 12
       }

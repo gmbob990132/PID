@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-30T08:06:12+00:00",
+  "generated_at": "2026-08-31T08:25:25+00:00",
   "metric": {
     "id": "al_alumina_spot",
     "name": "氧化铝现货",
@@ -38,6 +38,12 @@
       "value": 2715.0,
       "change": -5.0,
       "src_change": -5.0
+    },
+    {
+      "date": "2026-08-31",
+      "value": 2715.0,
+      "change": 0.0,
+      "src_change": 0.0
     }
   ]
 }
