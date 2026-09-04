@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-03T07:04:28+00:00",
-  "today": "2026-09-03",
+  "generated_at": "2026-09-04T07:05:56+00:00",
+  "today": "2026-09-04",
   "summary": {
     "ok": 12,
     "no_data": 0,
@@ -11,57 +11,57 @@
     {
       "metric_id": "al_spot_east",
       "name": "现货·华东",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_spot_south",
       "name": "现货·华南",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_spot_central",
       "name": "现货·中原",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_social_inv",
       "name": "社会库存",
       "latest_date": "2026-09-03",
-      "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "updated_today": false,
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_futures_main",
       "name": "沪铝主力",
-      "latest_date": "2026-09-02",
+      "latest_date": "2026-09-03",
       "updated_today": false,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_alumina_futures",
       "name": "氧化铝主力",
-      "latest_date": "2026-09-02",
+      "latest_date": "2026-09-03",
       "updated_today": false,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_lme_price",
       "name": "LME铝价",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
@@ -69,39 +69,39 @@
       "name": "LME库存",
       "latest_date": "2026-07-17",
       "updated_today": false,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_alumina_spot",
       "name": "氧化铝现货",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_ingot_a00",
       "name": "A00铝锭",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_anode",
       "name": "预焙阳极",
-      "latest_date": "2026-09-03",
+      "latest_date": "2026-09-04",
       "updated_today": true,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     },
     {
       "metric_id": "al_spot_premium",
       "name": "现货升贴水",
-      "latest_date": "2026-09-02",
+      "latest_date": "2026-09-03",
       "updated_today": false,
-      "last_run": "2026-09-03T07:01:30+00:00",
+      "last_run": "2026-09-04T07:05:45+00:00",
       "status": "ok"
     }
   ]

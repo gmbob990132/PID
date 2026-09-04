@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-03T07:04:28+00:00",
+  "generated_at": "2026-09-04T07:05:56+00:00",
   "metric": {
     "id": "al_lme_price",
     "name": "LME铝价",
@@ -15281,8 +15281,14 @@
     },
     {
       "date": "2026-09-03",
+      "value": 3317.5,
+      "change": 25.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-04",
       "value": 3299.5,
-      "change": 7.0,
+      "change": -18.0,
       "src_change": null
     }
   ]
