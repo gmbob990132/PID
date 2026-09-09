@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-08T07:05:32+00:00",
+  "generated_at": "2026-09-09T07:16:14+00:00",
   "metric": {
     "id": "al_anode",
     "name": "预焙阳极",
@@ -77,6 +77,12 @@
     },
     {
       "date": "2026-09-08",
+      "value": 5880.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-09",
       "value": 5880.0,
       "change": 0.0,
       "src_change": 0.0
