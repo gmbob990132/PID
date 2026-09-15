@@ -5,23 +5,21 @@
 
 数据源：
   - 中证指数官网接口：沪深300 每日行情 + PE(TTM)（字段 peg 实为 PE_TTM）
-  - akshare bond_china_yield：10 年期国债收益率
+  - 中债网：10 年期国债收益率（国债曲线，不会串成票据；替代原 akshare）
 衍生：
   - 股权溢价指数 = 1/PE(TTM)*100 − 10Y   （单位：%）
 
 落库策略：
-  - 首次（库里无数据）：从 2015-01-01 分批回填（接口单次限 5 年，分三段）
-  - 之后：每个指标各查自己库里最新日期，只增量补最新（含少量重叠冗余，幂等 upsert 自动去重）
-  - 幂等：PRIMARY KEY(metric_id, obs_date)，重复跑不产生重复
+  - 首次（库里无数据）：从 2015-01-01 分批回填（中证单次限 5 年、国债单次限 1 年）
+  - 之后：每个指标各查自己库里最新日期，只增量补最新（含少量重叠冗余，幂等 upsert 去重）
+  - 幂等：PRIMARY KEY(metric_id, obs_date)
 
 用法：
   python3 erp_ingest.py            # 联网抓取/补齐，写入 data/erp.db
-  python3 erp_ingest.py --selftest # 不联网，用内置样本验证 落库+回填分批+ERP 计算 逻辑
-
-结构分层（便于将来抽共用核心）：
-  配置 / 适配器(source) / 落库核心(store) / 衍生(derive) / 主流程(run)
+  python3 erp_ingest.py --selftest # 不联网，用内置样本验证 落库+ERP 计算 逻辑
 """
 import os
+import re
 import sys
 import json
 import sqlite3
@@ -32,12 +30,11 @@ CN_TZ = timezone(timedelta(hours=8))
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(HERE, "data", "erp.db")
 BACKFILL_START = date(2015, 1, 1)
-OVERLAP_DAYS = 7          # 增量时往前多取几天做重叠，容忍数据源回改
+OVERLAP_DAYS = 7
 _SELFTEST = False
 
 # ================= 配置：模块与指标 =================
 MODULE = {"id": "erp", "name": "股权溢价指数", "sort_order": 2}
-# 中证接口 raw 字段 → 指标 id / 名称 / 单位。close 与 peg 是核心，其余原样存备用。
 CSI_FIELDS = [
     ("close",        "csi300_close",  "沪深300点位", "点",   "price"),
     ("peg",          "csi300_pe_ttm", "市盈率TTM",   "倍",   "valuation"),
@@ -52,7 +49,7 @@ CSI_FIELDS = [
 BOND_METRIC = ("cn_10y_yield", "10年国债收益率", "%", "rate")
 ERP_METRIC = ("csi300_erp", "股权溢价指数", "%", "valuation")
 
-# 所有指标定义（导出/建表用）
+
 def all_metrics():
     ms = [{"id": mid, "name": nm, "unit": u, "category": cat}
           for (_f, mid, nm, u, cat) in CSI_FIELDS]
@@ -66,6 +63,11 @@ _CSI_URL = ("https://www.csindex.com.cn/csindex-home/perf/index-perf"
 _CSI_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                               "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Referer": "https://www.csindex.com.cn/", "Accept": "application/json, text/plain, */*"}
+_BOND_URL = ("https://yield.chinabond.com.cn/cbweb-cbrc-web/cbrc/historyQuery"
+             "?startDate={s}&endDate={e}&gjqx=10&qxId=hzsylqx&locale=en_US&mark=1")
+_BOND_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                               "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                 "Referer": "https://yield.chinabond.com.cn/", "Accept": "text/html,*/*"}
 
 
 def _norm_date(v):
@@ -104,7 +106,6 @@ def _to_float(v):
 
 
 def csi_fetch_window(start_ymd, end_ymd):
-    """取一个 <=5年 的窗口，返回 [{obs_date, <field>:value,...}]。"""
     req = Request(_CSI_URL.format(s=start_ymd, e=end_ymd), headers=_CSI_HEADERS)
     with urlopen(req, timeout=30) as r:
         data = json.loads(r.read().decode('utf-8'))
@@ -121,30 +122,34 @@ def csi_fetch_window(start_ymd, end_ymd):
 
 
 def csi_fetch_range(start_d, end_d):
-    """取 [start_d, end_d]，自动按 <5 年 分批（接口单次限制）。"""
     all_rows = []
     seg_start = start_d
     while seg_start <= end_d:
-        seg_end = min(date(seg_start.year + 4, 12, 31), end_d)   # 每段约 <5 年
+        seg_end = min(date(seg_start.year + 4, 12, 31), end_d)
         all_rows += csi_fetch_window(seg_start.strftime("%Y%m%d"), seg_end.strftime("%Y%m%d"))
         seg_start = seg_end + timedelta(days=1)
     return all_rows
 
 
 def bond_fetch_range(start_d, end_d):
-    """akshare 取 10Y，按 <1 年 分批（接口限制 end-start<1年）。返回 {date: yield}。"""
-    import akshare as ak
+    """从中债网取 10 年期国债收益率（国债曲线，不会串成票据）。
+    接口一次限一年，按年分段。返回 {日期str: 10Y收益率}。"""
     y = {}
     seg_start = start_d
     while seg_start <= end_d:
-        seg_end = min(seg_start + timedelta(days=350), end_d)
-        df = ak.bond_china_yield(start_date=seg_start.strftime("%Y%m%d"),
-                                 end_date=seg_end.strftime("%Y%m%d"))
-        for _, row in df.iterrows():
-            v = _to_float(row.get("10年"))
-            if v is not None:
-                y[_norm_date(row["日期"])] = v
-        seg_start = seg_end + timedelta(days=1)
+        seg_end = min(date(seg_start.year, 12, 31), end_d)
+        req = Request(_BOND_URL.format(s=seg_start.strftime("%Y-%m-%d"), e=seg_end.strftime("%Y-%m-%d")),
+                      headers=_BOND_HEADERS)
+        with urlopen(req, timeout=30) as r:
+            html = r.read().decode("utf-8", "ignore")
+        for tr in re.findall(r"<tr>(.*?)</tr>", html, re.S):
+            cells = [re.sub(r"<[^>]+>", "", c).strip()
+                     for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+            d = next((c for c in cells if re.match(r"\d{4}-\d{2}-\d{2}$", c)), None)
+            vals = [c for c in cells if re.match(r"\d+\.\d+$", c)]
+            if d and vals:
+                y[d] = float(vals[0])
+        seg_start = date(seg_start.year + 1, 1, 1)
     return y
 
 # ================= 落库核心（store 层）=================
@@ -194,7 +199,6 @@ def log_run(conn, metric_id, status, rows, msg, now_utc):
 
 
 def start_from(conn, metric_id, today):
-    """决定该指标本次从哪天开始取：库里有数据→最新日期往前重叠几天；没有→回填起点。"""
     last = latest_date(conn, metric_id)
     if last:
         d = datetime.strptime(last, "%Y-%m-%d").date() - timedelta(days=OVERLAP_DAYS)
@@ -203,7 +207,6 @@ def start_from(conn, metric_id, today):
 
 # ================= 衍生（derive 层）=================
 def compute_erp(conn, now_utc):
-    """ERP = 1/PE*100 − 10Y，按日期 join 两个指标；只在两者都有时算。"""
     rows = conn.execute(
         "SELECT a.obs_date, a.value AS pe, b.value AS y10 FROM observations a "
         "JOIN observations b ON a.obs_date=b.obs_date "
@@ -224,7 +227,6 @@ def run(db_path):
     try:
         init_db(conn)
 
-        # ---- 中证：以 close 的最新日期为准决定起点（同源字段一起取）----
         csi_start = start_from(conn, "csi300_close", today)
         first_backfill = (latest_date(conn, "csi300_close") is None)
         try:
@@ -245,7 +247,6 @@ def run(db_path):
             print("!! 中证取数失败：", ex)
             csi_ok = False
 
-        # ---- 国债 10Y：独立判断起点 ----
         bond_start = start_from(conn, BOND_METRIC[0], today)
         try:
             if _SELFTEST:
@@ -254,7 +255,7 @@ def run(db_path):
                 y10 = bond_fetch_range(bond_start, today)
             nb = 0
             for d, v in y10.items():
-                nb += upsert(conn, BOND_METRIC[0], d, v, "akshare_bond", now_utc)
+                nb += upsert(conn, BOND_METRIC[0], d, v, "chinabond", now_utc)
             log_run(conn, BOND_METRIC[0], "ok", nb, f"from {bond_start}", now_utc)
             bond_ok = True
         except Exception as ex:
@@ -262,12 +263,10 @@ def run(db_path):
             print("!! 国债取数失败：", ex)
             bond_ok = False
 
-        # ---- 衍生 ERP ----
         n_erp = compute_erp(conn, now_utc)
         log_run(conn, ERP_METRIC[0], "ok", n_erp, "computed", now_utc)
         conn.commit()
 
-        # ---- 反馈 ----
         mode = "首次回填" if first_backfill else "增量补齐"
         print(f"[{datetime.now(CN_TZ):%Y-%m-%d %H:%M} CST] {mode}完成 → {db_path}")
         for mid in ("csi300_close", "csi300_pe_ttm", "cn_10y_yield", "csi300_erp"):
@@ -285,7 +284,7 @@ def run(db_path):
     finally:
         conn.close()
 
-# ---- 自测样本（离线验证 落库+ERP，不联网）----
+# ---- 自测样本 ----
 _SAMPLE_CSI = [
     {"obs_date": "2026-09-03", "csi300_close": 4552.58, "csi300_pe_ttm": 13.65,
      "csi300_open": 4540.0, "csi300_high": 4560.0, "csi300_low": 4530.0,
