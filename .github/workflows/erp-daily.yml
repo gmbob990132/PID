@@ -15,6 +15,7 @@ jobs:
           python-version: '3.12'
       - run: pip install akshare
       - run: python3 erp_ingest.py
+      - run: python3 erp_export.py
       - name: 提交数据（无变化则跳过）
         run: |
           git config user.name  "github-actions"
