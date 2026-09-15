@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-14T07:48:06+00:00",
+  "generated_at": "2026-09-15T07:31:28+00:00",
   "metric": {
     "id": "al_futures_main",
     "name": "沪铝主力",
@@ -9,12 +9,6 @@
   },
   "range": "recent",
   "points": [
-    {
-      "date": "2026-07-31",
-      "value": 23630.0,
-      "change": 5.0,
-      "src_change": null
-    },
     {
       "date": "2026-08-03",
       "value": 23640.0,
@@ -193,6 +187,12 @@
       "date": "2026-09-11",
       "value": 24235.0,
       "change": -255.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-14",
+      "value": 24035.0,
+      "change": -200.0,
       "src_change": null
     }
   ]
