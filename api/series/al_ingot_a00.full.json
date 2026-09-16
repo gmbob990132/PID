@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-15T07:31:28+00:00",
+  "generated_at": "2026-09-16T07:29:28+00:00",
   "metric": {
     "id": "al_ingot_a00",
     "name": "A00铝锭",
@@ -98,6 +98,12 @@
       "value": 24140.0,
       "change": -100.0,
       "src_change": 60.0
+    },
+    {
+      "date": "2026-09-16",
+      "value": 24160.0,
+      "change": 20.0,
+      "src_change": 20.0
     }
   ]
 }

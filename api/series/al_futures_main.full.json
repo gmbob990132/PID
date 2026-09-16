@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-15T07:31:28+00:00",
+  "generated_at": "2026-09-16T07:29:28+00:00",
   "metric": {
     "id": "al_futures_main",
     "name": "沪铝主力",
@@ -1705,6 +1705,12 @@
       "date": "2026-09-14",
       "value": 24035.0,
       "change": -200.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-15",
+      "value": 24105.0,
+      "change": 70.0,
       "src_change": null
     }
   ]
