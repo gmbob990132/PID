@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-25T05:57:21+00:00",
+  "generated_at": "2026-09-26T05:52:44+00:00",
   "module": "aluminum",
-  "today": "2026-09-25",
+  "today": "2026-09-26",
   "metrics": [
     {
       "id": "al_spot_east",
@@ -23,7 +23,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 6
       }
@@ -47,7 +47,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 6
       }
@@ -71,7 +71,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 6
       }
@@ -95,7 +95,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 3
       }
@@ -119,9 +119,9 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
-        "rows_written": 267
+        "rows_written": 266
       }
     },
     {
@@ -143,9 +143,9 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
-        "rows_written": 267
+        "rows_written": 266
       }
     },
     {
@@ -159,15 +159,15 @@
       "hide_chart": true,
       "latest": {
         "date": "2026-09-25",
-        "value": 3262.5,
-        "mom": 11.0,
-        "yoy": 598.5,
+        "value": 3276.0,
+        "mom": 24.5,
+        "yoy": 612.0,
         "src_change": null,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 2538
       }
@@ -191,7 +191,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 2717
       }
@@ -215,7 +215,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -239,7 +239,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -263,7 +263,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -287,7 +287,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-09-25T05:52:22+00:00",
+        "run_at": "2026-09-26T05:52:30+00:00",
         "status": "ok",
         "rows_written": 31
       }
