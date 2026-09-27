@@ -1,0 +1,24 @@
+name: metals-daily
+on:
+  schedule:
+    - cron: '0 11 * * *'      # UTC 11:00 = 北京 19:00
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install akshare
+      - run: python3 metals_ingest.py
+      - run: python3 metals_export.py
+      - name: 提交数据（无变化则跳过）
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "无变化"; else git commit -m "metals update $(TZ=Asia/Shanghai date +%F)" && git push; fi
