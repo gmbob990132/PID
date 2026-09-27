@@ -467,7 +467,7 @@ async function renderMetalsChart(pane, metalId){
   const metrics = g.metrics.filter(m=> !m.hide_chart);   // 库存类不上价格图
   let html='<div class="ranges">';
   METALS_RANGES.forEach(([k,label])=> html+='<span class="rg'+(k===metalsRange?" on":"")+'" data-r="'+k+'">'+label+'</span>');
-  html+='</div><div class="chart" id="metalsChart"></div>';
+  html+='</div><div class="chart" id="metalsChart"></div><div class="tbl-wrap" id="metalsTbl"></div>';
   pane.innerHTML=html;
   pane.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ metalsRange=el.dataset.r; renderMetalsChart(pane,metalId); });
 
@@ -502,6 +502,25 @@ async function renderMetalsChart(pane, metalId){
     yAxis: yAxis.length?yAxis:[{type:"value",scale:true}],
     series: series,
   });
+  drawMetalsTable(metrics, seriesData, dates);
+}
+
+// 走势页表格：日期 + 各指标当日值（金/铜=收盘价，锂=各价中间价），跟随时间范围
+function drawMetalsTable(metrics, seriesData, dates){
+  const maps={}; metrics.forEach(m=>{ maps[m.id]={}; (seriesData[m.id]||[]).forEach(p=>maps[m.id][p.date]=p.value); });
+  let h='<table><thead><tr><th>日期</th>';
+  metrics.forEach(m=> h+='<th>'+m.name+'</th>');
+  h+='</tr></thead><tbody>';
+  [...dates].reverse().forEach(d=>{
+    h+='<tr><td>'+d+'</td>';
+    metrics.forEach(m=>{
+      const v=maps[m.id][d];
+      h+='<td>'+(v==null?'—':v.toLocaleString(undefined,{minimumFractionDigits:metalDp(m.unit),maximumFractionDigits:metalDp(m.unit)}))+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  document.getElementById("metalsTbl").innerHTML=h;
 }
 
 window.addEventListener("resize", ()=>{

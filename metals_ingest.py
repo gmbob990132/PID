@@ -53,8 +53,8 @@ LC_SPOT = [
 ]
 for _pid, _short, _full in LC_SPOT:
     METRICS.append({"id": f"{_pid}_mid", "name": f"碳酸锂现货·{_short}", "unit": "元/吨",
-                    "group": "lithium", "src": "mysteel_li", "params": {"name": _full, "field": "mid"},
-                    "hide_overview": (_pid != "lc_spot_batt")})  # 概览只放电池级；三级走势图都显示
+                    "group": "lithium", "src": "mysteel_li", "params": {"name": _full, "field": "mid"}})
+    # 三品级中间价都进概览卡与走势图
     for _sub, _cn in [("low", "最低"), ("high", "最高"), ("chg", "涨跌")]:
         METRICS.append({"id": f"{_pid}_{_sub}", "name": f"碳酸锂现货·{_short}·{_cn}", "unit": "元/吨",
                         "group": "lithium", "src": "mysteel_li", "params": {"name": _full, "field": _sub},
