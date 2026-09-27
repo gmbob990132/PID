@@ -143,6 +143,10 @@ function renderIndBar(){
     b.textContent=m.name; b.onclick=()=>selectModule(m.id);
     bar.appendChild(b);
   });
+  const mt=document.createElement("button");    // 金属模块
+  mt.className="ind-btn"+(curTop==="metals"?" on":"");
+  mt.textContent="金属"; mt.onclick=()=>selectMetals();
+  bar.appendChild(mt);
 }
 
 async function selectModule(id){
@@ -396,9 +400,114 @@ function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit){
   erpCharts.push(el);
 }
 
+
+// ================== 金属模块（新增：概览分块 + 金/铜/锂走势） ==================
+const METAL_ORDER = ["gold","copper","lithium"];
+const METALS_RANGES = [["1m","近1月"],["6m","近6月"],["1y","近1年"],["all","全部"]];
+let metalsOv = null, metalsSub = "overview", metalsRange = "1y", metalsChart = null;
+
+function metalDp(unit){
+  if(unit==="元/克") return 2;
+  if(unit==="美元/盎司"||unit==="万吨") return 1;
+  return 0;   // 元/吨、美元/吨
+}
+
+async function selectMetals(){
+  curTop="metals"; chart=null; erpCharts=[]; metalsChart=null;
+  renderIndBar();
+  metalsOv = await loadJSON("metals_api/overview.json");
+  metalsSub = "overview";
+  renderMetalsSubBar();
+  renderMetalsPane();
+}
+
+function renderMetalsSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  const subs=["overview"].concat(METAL_ORDER.filter(k=> (metalsOv.metals||[]).some(g=>g.id===k)));
+  subs.forEach(k=>{
+    const b=document.createElement("button");
+    const label = k==="overview" ? "概览" : (metalsOv.metals.find(g=>g.id===k)||{}).name;
+    b.className="sub-btn"+(k===metalsSub?" on":"");
+    b.textContent=label; b.onclick=()=>{ metalsSub=k; renderMetalsSubBar(); renderMetalsPane(); };
+    bar.appendChild(b);
+  });
+}
+
+async function renderMetalsPane(){
+  metalsChart=null;
+  const pane=document.getElementById("pane");
+  if(metalsSub==="overview"){ renderMetalsOverview(pane); }
+  else { await renderMetalsChart(pane, metalsSub); }
+}
+
+// —— 概览：按金属分块（分组标题 + 卡片网格）——
+function renderMetalsOverview(pane){
+  let html="";
+  metalsOv.metals.forEach(g=>{
+    html += '<div class="grp-title">'+g.name+'</div><div class="grid">';
+    g.metrics.forEach(m=>{
+      if(m.hide_overview) return;   // 概览卡跳过隐藏项（如优质/工业级中间价、现货最低最高涨跌）
+      const L=m.latest, dp=metalDp(m.unit);
+      html += '<div class="card"><div class="top"><span class="nm">'+m.name+
+        '</span><span class="dot" style="background:'+(L?"var(--down)":"var(--muted)")+'"></span></div>';
+      if(L){
+        html += '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+m.unit+'</span></div>';
+        html += '<div class="chg '+chgClass(L.change)+'">'+chgText(L.change,dp)+'</div>';
+      } else { html += '<div class="val" style="color:var(--muted)">暂无</div>'; }
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  pane.innerHTML = html || '<div class="empty">暂无数据</div>';
+}
+
+// —— 单金属页：走势图（同量纲同轴，不同量纲用左右双轴）——
+async function renderMetalsChart(pane, metalId){
+  const g = metalsOv.metals.find(x=>x.id===metalId);
+  const metrics = g.metrics.filter(m=> !m.hide_chart);   // 库存类不上价格图
+  let html='<div class="ranges">';
+  METALS_RANGES.forEach(([k,label])=> html+='<span class="rg'+(k===metalsRange?" on":"")+'" data-r="'+k+'">'+label+'</span>');
+  html+='</div><div class="chart" id="metalsChart"></div>';
+  pane.innerHTML=html;
+  pane.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ metalsRange=el.dataset.r; renderMetalsChart(pane,metalId); });
+
+  const useFull = (metalsRange==="1y"||metalsRange==="all");
+  const seriesData={};
+  for(const m of metrics){
+    const s = await loadCached("metals_api/series/"+m.id+(useFull?".full":"")+".json");
+    seriesData[m.id] = (s&&s.points)||[];
+  }
+  const cutoff = rangeCutoff(metalsRange);
+  const dateSet=new Set();
+  metrics.forEach(m=> seriesData[m.id].forEach(p=>{ if(!cutoff||p.date>=cutoff) dateSet.add(p.date); }));
+  const dates=[...dateSet].sort();
+
+  // 按单位分配 y 轴（最多两个）
+  const units=[]; metrics.forEach(m=>{ if(!units.includes(m.unit)) units.push(m.unit); });
+  const yAxis = units.slice(0,2).map((u,i)=>({type:"value",scale:true,name:u,position:i===0?"left":"right",
+    splitLine:{show:i===0,lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}}));
+  const series = metrics.map((m,i)=>{
+    const map={}; seriesData[m.id].forEach(p=>map[p.date]=p.value);
+    const axi = units.indexOf(m.unit); 
+    return {name:m.name,type:"line",yAxisIndex:(axi>1?1:axi),showSymbol:false,lineStyle:{width:2},
+      itemStyle:{color:SERIES_COLORS[i%SERIES_COLORS.length]},
+      data:dates.map(d=> d in map?map[d]:null),connectNulls:true};
+  });
+  metalsChart=echarts.init(document.getElementById("metalsChart"));
+  metalsChart.setOption({
+    grid:{left:8,right:units.length>1?12:12,top:36,bottom:24,containLabel:true},
+    legend:{top:0,data:metrics.map(m=>m.name),icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis"},
+    xAxis:{type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}},
+    yAxis: yAxis.length?yAxis:[{type:"value",scale:true}],
+    series: series,
+  });
+}
+
 window.addEventListener("resize", ()=>{
   if(chart) chart.resize();
   erpCharts.forEach(c=> c && c.resize && c.resize());
+  if(metalsChart) metalsChart.resize();
 });
 boot();
 </script>
