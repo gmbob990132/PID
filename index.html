@@ -277,6 +277,7 @@ function drawTable(metrics, seriesData, dates, dp){
 // ================== 股权溢价指数部分（新增） ==================
 const ERP_RANGES = [["1m","一月"],["3m","三月"],["ytd","年至今"],["1y","一年"],["3y","三年"],["5y","五年"]];
 let erpRange = "1y";
+let erpIndexes = [], curErpIdx = "csi300";
 let erpCustom = null;              // {start,end} 自定义
 let erpCharts = [];                // 三张图实例，供 resize
 let erpDetailFields = [], erpDetailMap = {};
@@ -284,11 +285,28 @@ let erpDetailFields = [], erpDetailMap = {};
 function selectErp(){
   curTop="erp"; chart=null; erpCharts=[];
   renderIndBar();
-  const bar=document.getElementById("subBar"); bar.innerHTML="";
-  const b=document.createElement("button"); b.className="sub-btn on"; b.textContent="沪深300";
-  bar.appendChild(b);
-  renderErpPane();
+  (async()=>{
+    if(!erpIndexes.length){
+      try{ const ix=await loadJSON("erp_api/indexes.json"); erpIndexes=ix.indexes||[]; }
+      catch(e){ erpIndexes=[{id:"csi300",name:"沪深300"}]; }
+    }
+    if(!erpIndexes.some(x=>x.id===curErpIdx)) curErpIdx=(erpIndexes[0]||{}).id||"csi300";
+    renderErpSubBar();
+    renderErpPane();
+  })();
 }
+
+function renderErpSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  erpIndexes.forEach(ix=>{
+    const b=document.createElement("button");
+    b.className="sub-btn"+(ix.id===curErpIdx?" on":"");
+    b.textContent=ix.name; b.onclick=()=>{ curErpIdx=ix.id; renderErpSubBar(); renderErpPane(); };
+    bar.appendChild(b);
+  });
+}
+
+function erpIdxName(){ return (erpIndexes.find(x=>x.id===curErpIdx)||{}).name||""; }
 
 function erpCutoff(){
   if(erpCustom && erpCustom.start) return erpCustom.start;
@@ -304,16 +322,17 @@ function erpUseFull(){
 
 async function renderErpPane(){
   const pane=document.getElementById("pane");
+  const nm=erpIdxName();
   let html='<div class="erp-timebar">';
   ERP_RANGES.forEach(([k,label])=> html+='<span class="erp-rg'+((!erpCustom&&k===erpRange)?" on":"")+'" data-r="'+k+'">'+label+'</span>');
   html+='<span class="erp-custom"><input type="date" id="erpStart"> 至 <input type="date" id="erpEnd"></span>';
   html+='</div>';
-  html+='<div class="erp-chart-title">沪深300 点位 & 股权溢价指数</div>';
+  html+='<div class="erp-chart-title">'+nm+' 点位 & 股权溢价指数</div>';
   html+='<div class="erp-chart-sub">左轴：点位　右轴：股权溢价指数(%)　（悬停看当日明细）</div>';
   html+='<div class="erp-chart" id="erpc1"></div>';
-  html+='<div class="erp-chart-title">股权溢价指数</div>';
+  html+='<div class="erp-chart-title">'+nm+' 股权溢价指数</div>';
   html+='<div class="erp-chart-sub" id="erpsub2"></div><div class="erp-chart" id="erpc2"></div>';
-  html+='<div class="erp-chart-title">市盈率 PE(TTM)</div>';
+  html+='<div class="erp-chart-title">'+nm+' 市盈率 PE(TTM)</div>';
   html+='<div class="erp-chart-sub" id="erpsub3"></div><div class="erp-chart" id="erpc3"></div>';
   pane.innerHTML=html;
 
@@ -329,13 +348,14 @@ async function renderErpPane(){
 }
 
 async function drawErp(){
+  const idx=curErpIdx, nm=erpIdxName();
   const full=erpUseFull(), sfx=full?".full":"";
   const [close, pe, erp, daily, perc] = await Promise.all([
-    loadCached("erp_api/series/csi300_close"+sfx+".json"),
-    loadCached("erp_api/series/csi300_pe_ttm"+sfx+".json"),
-    loadCached("erp_api/series/csi300_erp"+sfx+".json"),
-    loadCached("erp_api/daily"+sfx+".json"),
-    loadCached("erp_api/percentiles.json"),
+    loadCached("erp_api/"+idx+"/series/close"+sfx+".json"),
+    loadCached("erp_api/"+idx+"/series/pe_ttm"+sfx+".json"),
+    loadCached("erp_api/"+idx+"/series/erp"+sfx+".json"),
+    loadCached("erp_api/"+idx+"/daily"+sfx+".json"),
+    loadCached("erp_api/"+idx+"/percentiles.json"),
   ]);
   const c0=erpCutoff(), c1=erpEnd();
   const flt=pts=> pts.filter(p=> p.date>=c0 && p.date<=c1);
@@ -350,13 +370,13 @@ async function drawErp(){
   const c1el=echarts.init(document.getElementById("erpc1"));
   c1el.setOption({
     grid:{left:8,right:10,top:34,bottom:24,containLabel:true},
-    legend:{top:0,data:["沪深300","股权溢价指数"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    legend:{top:0,data:[nm,"股权溢价指数"],icon:"roundRect",itemWidth:14,itemHeight:3},
     tooltip:{trigger:"axis", formatter:function(ps){
       const d=ps[0].axisValue, row=erpDetailMap[d];
       let s='<b>'+d+'</b>';
       if(row){ erpDetailFields.forEach(([fid,cn])=>{ let v=row[fid];
         if(v==null) return;
-        v=(fid==='csi300_pct')?v+'%':Number(v).toLocaleString();
+        v=(fid==='pct')?v+'%':Number(v).toLocaleString();
         s+='<br>'+cn+'：'+v; }); }
       const e=ps.find(p=>p.seriesName==="股权溢价指数");
       if(e&&e.value!=null) s+='<br>股权溢价指数：'+Number(e.value).toFixed(2)+'%';
@@ -366,15 +386,15 @@ async function drawErp(){
     yAxis:[{type:"value",scale:true,name:"点位",splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
            {type:"value",scale:true,name:"溢价%",splitLine:{show:false},axisLabel:{color:"#888"}}],
     series:[
-      {name:"沪深300",type:"line",yAxisIndex:0,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},data:closeF.map(p=>p.value)},
+      {name:nm,type:"line",yAxisIndex:0,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},data:closeF.map(p=>p.value)},
       {name:"股权溢价指数",type:"line",yAxisIndex:1,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#d4537e"},data:erpF.map(p=>p.value)},
     ],
   });
 
   // —— 图2：ERP + 近5年分位线 ——
-  drawErpQuant("erpc2","erpsub2","股权溢价指数","#d4537e",dates,erpF,(perc.csi300_erp||{})["5y"],2,"%");
+  drawErpQuant("erpc2","erpsub2","股权溢价指数","#d4537e",dates,erpF,(perc.erp||{})["5y"],2,"%");
   // —— 图3：PE + 近5年分位线 ——
-  drawErpQuant("erpc3","erpsub3","PE(TTM)","#1d9e75",dates,peF,(perc.csi300_pe_ttm||{})["5y"],2,"");
+  drawErpQuant("erpc3","erpsub3","PE(TTM)","#1d9e75",dates,peF,(perc.pe_ttm||{})["5y"],2,"");
   erpCharts=[c1el, erpCharts[0], erpCharts[1]].filter(Boolean);
 }
 
