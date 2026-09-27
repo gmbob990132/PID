@@ -127,23 +127,22 @@ async function boot(){
       "数据源 Mysteel 等 · 最近生成 " + (md.generated_at||"").slice(0,16).replace("T"," ");
   }catch(e){ MODULES = []; document.getElementById("subhead").textContent = "持仓与估值数据"; }
   renderIndBar();
-  if(MODULES.length){ selectModule(MODULES[0].id); }
-  else { selectErp(); }   // 无大宗数据（如本地预览）时直接进股权溢价指数
+  selectErp();   // 默认打开股权溢价指数（放首位）
 }
 
 function renderIndBar(){
   const bar = document.getElementById("indBar");
   bar.innerHTML = "";
-  MODULES.forEach(m=>{
+  const e=document.createElement("button");   // 股权溢价指数放首位
+  e.className="ind-btn"+(curTop==="erp"?" on":"");
+  e.textContent="股权溢价指数"; e.onclick=()=>selectErp();
+  bar.appendChild(e);
+  MODULES.forEach(m=>{                          // 大宗模块（电解铝）其次
     const b=document.createElement("button");
     b.className="ind-btn"+(curTop===m.id?" on":"");
     b.textContent=m.name; b.onclick=()=>selectModule(m.id);
     bar.appendChild(b);
   });
-  const e=document.createElement("button");   // 新增：股权溢价指数一级 tab
-  e.className="ind-btn"+(curTop==="erp"?" on":"");
-  e.textContent="股权溢价指数"; e.onclick=()=>selectErp();
-  bar.appendChild(e);
 }
 
 async function selectModule(id){
@@ -382,12 +381,12 @@ function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit){
     sub.textContent="分位线：近5年　20% "+q.p20.toFixed(dp)+unit+"　50% "+q.p50.toFixed(dp)+unit+"　80% "+q.p80.toFixed(dp)+unit;
     [["20%",q.p20,"#8fbf8f"],["50%",q.p50,"#e0a53b"],["80%",q.p80,"#d47a7a"]].forEach(([lab,val,col])=>{
       ml.push({yAxis:val, lineStyle:{type:"dashed",color:col,width:1},
-        label:{formatter:lab+"分位 "+val.toFixed(dp)+unit, color:col, position:"end", fontSize:11}});
+        label:{formatter:lab+"分位 "+val.toFixed(dp)+unit, color:col, position:"end", distance:4, fontSize:11}});
     });
   } else { sub.textContent=""; }
   const el=echarts.init(document.getElementById(elId));
   el.setOption({
-    grid:{left:8,right:64,top:16,bottom:24,containLabel:true},
+    grid:{left:8,right:96,top:16,bottom:24,containLabel:true},
     tooltip:{trigger:"axis", valueFormatter:v=> v==null?"—":Number(v).toFixed(dp)+unit},
     xAxis:{type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}},
     yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
