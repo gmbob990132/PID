@@ -72,6 +72,8 @@
     .wrap{padding:14px 12px 40px}.chart{height:280px}
     .card{padding:14px 15px;border-radius:14px}.card .val{font-size:24px}
   }
+  .agri-acc{grid-column:1/-1;background:var(--card);border:1px solid var(--navy);border-radius:16px;padding:10px 14px;margin-top:-4px}
+  .agri-sub{font-size:12.5px;color:var(--sec);margin:4px 2px 6px}
 </style>
 </head>
 <body>
@@ -147,6 +149,10 @@ function renderIndBar(){
   mt.className="ind-btn"+(curTop==="metals"?" on":"");
   mt.textContent="金属"; mt.onclick=()=>selectMetals();
   bar.appendChild(mt);
+  const ag=document.createElement("button");    // 农产品模块
+  ag.className="ind-btn"+(curTop==="agri"?" on":"");
+  ag.textContent="农产品"; ag.onclick=()=>selectAgri();
+  bar.appendChild(ag);
 }
 
 async function selectModule(id){
@@ -543,10 +549,91 @@ function drawMetalsTable(metrics, seriesData, dates){
   document.getElementById("metalsTbl").innerHTML=h;
 }
 
+// ================== 农产品模块（概览网格 + 手风琴展开历史图+分位） ==================
+let agriOv = null, agriOpen = null, agriChart = null, agriRange = "1y";
+const AGRI_RANGES = [["6m","近6月"],["1y","近1年"],["3y","近3年"],["all","全部"]];
+
+async function selectAgri(){
+  curTop="agri"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null; agriOpen=null;
+  renderIndBar();
+  document.getElementById("subBar").innerHTML="";   // 农产品只有一页，不需要子tab
+  agriOv = await loadJSON("agri_api/overview.json");
+  renderAgri();
+}
+
+function agriChgCls(v){ return v>0?"up":(v<0?"down":"flat"); }
+function agriChgTxt(v){ if(v==null) return "—"; return (v>0?"▲ +":(v<0?"▼ ":"— "))+Math.abs(v).toLocaleString(); }
+
+function renderAgri(){
+  const pane=document.getElementById("pane");
+  const ps=(agriOv.products||[]);
+  let html='<div class="grid">';
+  ps.forEach(p=>{
+    const L=p.latest;
+    html+='<div class="card agri-card'+(p.id===agriOpen?' on':'')+'" data-pid="'+p.id+'" style="cursor:pointer">'+
+      '<div class="nm">'+p.name+'</div>'+
+      (L? '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+p.unit+'</span></div>'+
+          '<div class="chg '+agriChgCls(p.change)+'">'+agriChgTxt(p.change)+'</div>'
+        : '<div class="val" style="color:var(--muted)">暂无</div>')+
+      '</div>';
+    if(p.id===agriOpen){
+      html+='<div class="agri-acc"><div class="ranges" id="agriRanges">';
+      AGRI_RANGES.forEach(([k,lb])=> html+='<span class="rg'+(k===agriRange?" on":"")+'" data-r="'+k+'">'+lb+'</span>');
+      html+='</div><div class="agri-sub">'+p.name+' · 历史价格 + 20/50/80 分位线</div>'+
+            '<div class="chart" id="agriChart"></div></div>';
+    }
+  });
+  html+='</div>';
+  pane.innerHTML=html;
+
+  pane.querySelectorAll(".agri-card").forEach(c=> c.onclick=(e)=>{
+    if(e.target.closest(".agri-acc")) return;         // 点展开区内部不收起
+    agriOpen = (agriOpen===c.dataset.pid)? null : c.dataset.pid;
+    if(agriChart){ agriChart.dispose(); agriChart=null; }
+    renderAgri();
+  });
+  if(agriOpen){
+    const rr=document.getElementById("agriRanges");
+    if(rr) rr.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ agriRange=el.dataset.r; drawAgriChart(agriOpen); });
+    drawAgriChart(agriOpen);
+  }
+}
+
+async function drawAgriChart(pid){
+  const p=(agriOv.products||[]).find(x=>x.id===pid); if(!p) return;
+  const useFull=(agriRange==="3y"||agriRange==="all");
+  const s=await loadCached("agri_api/series/"+pid+(useFull?".full":"")+".json");
+  let pts=(s&&s.points)||[];
+  const cutoff=agriRangeCutoff(agriRange);
+  if(cutoff) pts=pts.filter(x=>x.date>=cutoff);
+  const ml=[["20%",p.p20,"#8fbf8f"],["50%",p.p50,"#e0a53b"],["80%",p.p80,"#d47a7a"]]
+    .filter(x=>x[1]!=null).map(([lab,val,col])=>(
+      {yAxis:val,lineStyle:{type:"dashed",color:col,width:1},
+       label:{formatter:lab+"分位 "+val.toLocaleString(),color:col,position:"end",distance:4,fontSize:11}}));
+  const el=document.getElementById("agriChart"); if(!el) return;
+  agriChart=echarts.init(el);
+  agriChart.setOption({
+    grid:{left:8,right:92,top:16,bottom:24,containLabel:true},
+    tooltip:{trigger:"axis", valueFormatter:v=> v==null?"—":Number(v).toLocaleString()},
+    xAxis:{type:"category",data:pts.map(x=>x.date),boundaryGap:false,
+      axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}},
+    yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:[{name:p.name,type:"line",showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},
+      data:pts.map(x=>x.value),markLine:{silent:true,symbol:"none",data:ml}}],
+  });
+}
+
+function agriRangeCutoff(k){
+  const days={"6m":183,"1y":366,"3y":1096,"all":null}[k];
+  if(!days) return null;
+  const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10);
+}
+
 window.addEventListener("resize", ()=>{
   if(chart) chart.resize();
   erpCharts.forEach(c=> c && c.resize && c.resize());
   if(metalsChart) metalsChart.resize();
+  if(agriChart) agriChart.resize();
 });
 boot();
 </script>
