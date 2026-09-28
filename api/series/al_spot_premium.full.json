@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-27T06:19:40+00:00",
+  "generated_at": "2026-09-28T06:20:43+00:00",
   "metric": {
     "id": "al_spot_premium",
     "name": "现货升贴水",

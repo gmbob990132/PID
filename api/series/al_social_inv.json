@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-27T06:19:40+00:00",
+  "generated_at": "2026-09-28T06:20:43+00:00",
   "metric": {
     "id": "al_social_inv",
     "name": "社会库存",
@@ -80,6 +80,12 @@
       "value": 65.1,
       "change": -4.700000000000003,
       "src_change": -4.7
+    },
+    {
+      "date": "2026-09-28",
+      "value": 64.2,
+      "change": -0.8999999999999915,
+      "src_change": -0.9
     }
   ]
 }
