@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>持仓数据看板</title>
+<title>投资数据看板</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
   :root{
@@ -78,8 +78,8 @@
 </head>
 <body>
 <header>
-  <h1>持仓数据看板</h1>
-  <div class="sub" id="subhead">加载中…</div>
+  <h1>投资数据看板</h1>
+  <div class="sub" id="subhead" style="display:none">加载中…</div>
 </header>
 <div class="ind-bar" id="indBar"></div>
 <div class="wrap">
@@ -125,9 +125,8 @@ async function boot(){
   try{
     const md = await loadJSON("api/modules.json");
     MODULES = md.modules || [];
-    document.getElementById("subhead").textContent =
-      "数据源 Mysteel 等 · 最近生成 " + (md.generated_at||"").slice(0,16).replace("T"," ");
-  }catch(e){ MODULES = []; document.getElementById("subhead").textContent = "持仓与估值数据"; }
+    document.getElementById("subhead").textContent = "";
+  }catch(e){ MODULES = []; document.getElementById("subhead").textContent = ""; }
   renderIndBar();
   selectErp();   // 默认打开股权溢价指数（放首位）
 }
@@ -280,7 +279,7 @@ function drawTable(metrics, seriesData, dates, dp){
   document.getElementById("tbl").innerHTML=h;
 }
 
-// ================== 指数估值模块（PE/PB/PS 分位 + 成分中位数；沪深300 保留 ERP；时间范围联动）==================
+// ================== 指数估值模块（PE/PB/PS 分位 + 成分股中位数；沪深300 保留 ERP；时间范围联动）==================
 let curErpIdx = "csi300";
 let valIndexes = [];
 let valMetric = "pe", valYear = 5;
@@ -323,7 +322,7 @@ function valCard(lab, L, M, pos){
   return '<div class="card"><div class="nm">'+lab+'</div>'+
     '<div><span class="val">'+(L&&L.value!=null?L.value.toFixed(2):"—")+'</span></div>'+
     '<div class="chg '+valPosClass(pos)+'">近'+valYear+'年百分位 '+posTxt+'</div>'+
-    '<div class="meta-line">成分中位数 '+(M&&M.value!=null?M.value.toFixed(2):"—")+'</div></div>';
+    '<div class="meta-line">成分股中位数 '+(M&&M.value!=null?M.value.toFixed(2):"—")+'</div></div>';
 }
 
 // 显示范围裁剪
@@ -387,7 +386,7 @@ async function renderValPane(){
 
   erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[];
 
-  // 估值分位图：加权线 + 成分中位数线；分位线只对加权
+  // 估值分位图：加权线 + 成分股中位数线；分位线只对加权
   const label={pe:"PE-TTM",pb:"PB",ps:"PS-TTM"}[valMetric];
   const [ws, ms] = await Promise.all([
     loadCached("valuation_api/"+idx+"/series/"+valMetric+".full.json"),
@@ -399,7 +398,7 @@ async function renderValPane(){
   if(idx==="csi300") await drawCsi300Erp();
 }
 
-// 估值图：两条线(加权+成分中位数) + 加权的三条分位线
+// 估值图：两条线(加权+成分股中位数) + 加权的三条分位线
 function drawValQuant(elId, subId, name, wpts, mpts, q, dp, yrLabel){
   const sub=document.getElementById(subId); const ml=[];
   if(q){
@@ -414,14 +413,14 @@ function drawValQuant(elId, subId, name, wpts, mpts, q, dp, yrLabel){
   const el=echarts.init(document.getElementById(elId));
   el.setOption({
     grid:{left:8,right:96,top:30,bottom:24,containLabel:true},
-    legend:{top:0,data:[name+"（加权）","成分中位数"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    legend:{top:0,data:[name+"（加权）","成分股中位数"],selected:{"成分股中位数":false},icon:"roundRect",itemWidth:14,itemHeight:3},
     tooltip:{trigger:"axis", valueFormatter:v=> v==null?"—":Number(v).toFixed(dp)},
     xAxis:{type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}},
     yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
     series:[
       {name:name+"（加权）",type:"line",showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#1d9e75"},
         data:wpts.map(p=>p.value), markLine:{silent:true,symbol:"none",data:ml}},
-      {name:"成分中位数",type:"line",showSymbol:false,lineStyle:{width:1.5,type:"dashed"},itemStyle:{color:"#8a5cd1"},
+      {name:"成分股中位数",type:"line",showSymbol:false,lineStyle:{width:1.5,type:"dashed"},itemStyle:{color:"#8a5cd1"},
         data:dates.map(d=> d in mmap? mmap[d]:null), connectNulls:true},
     ],
   });
