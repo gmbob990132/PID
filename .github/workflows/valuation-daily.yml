@@ -1,0 +1,35 @@
+name: valuation-daily
+on:
+  schedule:
+    - cron: '0 23 * * *'      # UTC 23:00 = 北京次日 07:00
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: valuation-daily
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 抓取估值（增量）
+        env:
+          LIXINGER_TOKEN: ${{ secrets.LIXINGER_TOKEN }}
+        run: python3 valuation_ingest.py
+      - name: 导出 JSON
+        run: python3 valuation_export.py
+      - name: 提交（先同步远端再推，避免并发冲突）
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then echo "无变化"; exit 0; fi
+          git commit -m "valuation update $(TZ=Asia/Shanghai date +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "推送重试 $i…"; sleep 5
+          done
