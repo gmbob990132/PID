@@ -280,11 +280,13 @@ function drawTable(metrics, seriesData, dates, dp){
   document.getElementById("tbl").innerHTML=h;
 }
 
-// ================== 指数估值模块（PE/PB/PS 分位；沪深300 保留 ERP）==================
+// ================== 指数估值模块（PE/PB/PS 分位 + 成分中位数；沪深300 保留 ERP；时间范围联动）==================
 let curErpIdx = "csi300";
 let valIndexes = [];
 let valMetric = "pe", valYear = 5;
+let valRange = "5y", valCustom = null;   // 显示范围（不影响分位口径）
 let erpCharts = [];
+const VAL_RANGES = [["1m","一月"],["3m","三月"],["ytd","年至今"],["1y","一年"],["3y","三年"],["5y","五年"],["all","全部"]];
 
 function selectErp(){                 // 一级 tab「指数估值」处理器（沿用函数名）
   curTop="erp"; chart=null; erpCharts=[];
@@ -315,14 +317,25 @@ function renderValSubBar(){
 }
 
 function valIdxMeta(){ return valIndexes.find(x=>x.id===curErpIdx)||{name:"",years:[5]}; }
-function valPosClass(pos){ return pos==null?"flat":(pos<0.3?"down":(pos>0.7?"up":"flat")); }
+function valPosClass(pos){ return pos==null?"flat":(pos<0.3?"down":(pos>0.7?"up":"flat")); }  // 高分位=贵=红(up)，低=便宜=绿(down)
 function valCard(lab, L, M, pos){
   const posTxt = pos==null? "—" : (Math.round(pos*100)+"%");
   return '<div class="card"><div class="nm">'+lab+'</div>'+
     '<div><span class="val">'+(L&&L.value!=null?L.value.toFixed(2):"—")+'</span></div>'+
-    '<div class="meta-line">中位数 '+(M&&M.value!=null?M.value.toFixed(2):"—")+'</div>'+
-    '<div class="chg '+valPosClass(pos)+'">近'+valYear+'年百分位 '+posTxt+'</div></div>';
+    '<div class="chg '+valPosClass(pos)+'">近'+valYear+'年百分位 '+posTxt+'</div>'+
+    '<div class="meta-line">成分中位数 '+(M&&M.value!=null?M.value.toFixed(2):"—")+'</div></div>';
 }
+
+// 显示范围裁剪
+function valCutoff(){
+  if(valCustom && valCustom.start) return valCustom.start;
+  if(valRange==="all") return "0000-01-01";
+  if(valRange==="ytd") return (new Date().getFullYear())+"-01-01";
+  const days={"1m":30,"3m":92,"1y":366,"3y":1096,"5y":1827}[valRange];
+  const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10);
+}
+function valEnd(){ return (valCustom&&valCustom.end)?valCustom.end:"9999-12-31"; }
+function fltRange(pts){ const a=valCutoff(),b=valEnd(); return pts.filter(p=> p.date>=a && p.date<=b); }
 
 async function renderValPane(){
   const pane=document.getElementById("pane");
@@ -331,15 +344,23 @@ async function renderValPane(){
     loadCached("valuation_api/"+idx+"/overview.json"),
     loadCached("valuation_api/"+idx+"/percentiles.json"),
   ]);
+  // 估值卡
   let html='<div class="grp-title">'+nm+' 估值</div><div class="grid">';
   [["pe","PE-TTM","pe_median"],["pb","PB","pb_median"],["ps","PS-TTM","ps_median"]].forEach(([m,lab,med])=>{
     const q=(perc.metrics[m]||{})[valYear+"y"];
     html+=valCard(lab, ov.latest[m], ov.latest[med], q?q.cur_pos:null);
   });
   html+='</div>';
+  // 时间范围（控制所有图的显示长度；分位线固定）
+  html+='<div class="erp-timebar">';
+  VAL_RANGES.forEach(([k,label])=> html+='<span class="erp-rg'+((!valCustom&&k===valRange)?" on":"")+'" data-r="'+k+'">'+label+'</span>');
+  html+='<span class="erp-custom"><input type="date" id="valStart"> 至 <input type="date" id="valEnd"></span>';
+  html+='</div>';
+  // 指标切换 PE/PB/PS
   html+='<div class="ranges" id="valMetricBar">';
   [["pe","PE"],["pb","PB"],["ps","PS"]].forEach(([m,l])=> html+='<span class="rg'+(m===valMetric?" on":"")+'" data-m="'+m+'">'+l+'</span>');
   html+='</div>';
+  // 分位年数切换
   if(years.length>1){
     html+='<div class="ranges" id="valYearBar">';
     years.forEach(y=> html+='<span class="rg'+(y===valYear?" on":"")+'" data-y="'+y+'">近'+y+'年</span>');
@@ -348,21 +369,75 @@ async function renderValPane(){
   html+='<div class="erp-chart-sub" id="valsub"></div><div class="erp-chart" id="valchart"></div>';
   if(idx==="csi300"){
     html+='<div class="erp-chart-title" style="margin-top:22px">沪深300 股权溢价指数（股债性价比）</div>';
+    html+='<div class="erp-chart-sub" id="erphead"></div>';
     html+='<div class="erp-chart-sub">点位（左轴）+ 股权溢价指数%（右轴）</div><div class="erp-chart" id="erpc1"></div>';
     html+='<div class="erp-chart-sub" id="erpsub2"></div><div class="erp-chart" id="erpc2"></div>';
   }
   pane.innerHTML=html;
+
+  // 交互
   document.querySelectorAll("#valMetricBar .rg").forEach(el=>el.onclick=()=>{ valMetric=el.dataset.m; renderValPane(); });
   const yb=document.getElementById("valYearBar");
   if(yb) yb.querySelectorAll(".rg").forEach(el=>el.onclick=()=>{ valYear=+el.dataset.y; renderValPane(); });
+  document.querySelectorAll(".erp-rg").forEach(el=>el.onclick=()=>{ valRange=el.dataset.r; valCustom=null; renderValPane(); });
+  const si=document.getElementById("valStart"), ei=document.getElementById("valEnd");
+  if(valCustom){ if(si)si.value=valCustom.start||""; if(ei)ei.value=valCustom.end||""; }
+  const onC=()=>{ if(si&&si.value){ valCustom={start:si.value, end:(ei&&ei.value)||undefined}; renderValPane(); } };
+  if(si) si.onchange=onC; if(ei) ei.onchange=onC;
 
   erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[];
-  const s=await loadCached("valuation_api/"+idx+"/series/"+valMetric+".full.json");
+
+  // 估值分位图：加权线 + 成分中位数线；分位线只对加权
   const label={pe:"PE-TTM",pb:"PB",ps:"PS-TTM"}[valMetric];
+  const [ws, ms] = await Promise.all([
+    loadCached("valuation_api/"+idx+"/series/"+valMetric+".full.json"),
+    loadCached("valuation_api/"+idx+"/series/"+valMetric+"_median.full.json").catch(()=>({points:[]})),
+  ]);
   const q=(perc.metrics[valMetric]||{})[valYear+"y"];
-  drawErpQuant("valchart","valsub",label,"#1d9e75",s.points.map(p=>p.date),s.points,q,2,"","近"+valYear+"年");
+  drawValQuant("valchart","valsub",label,fltRange(ws.points||[]),fltRange((ms&&ms.points)||[]),q,2,"近"+valYear+"年");
+
   if(idx==="csi300") await drawCsi300Erp();
 }
+
+// 估值图：两条线(加权+成分中位数) + 加权的三条分位线
+function drawValQuant(elId, subId, name, wpts, mpts, q, dp, yrLabel){
+  const sub=document.getElementById(subId); const ml=[];
+  if(q){
+    sub.textContent="分位线（"+yrLabel+"，对加权值）：20% "+q.p20.toFixed(dp)+"　50% "+q.p50.toFixed(dp)+"　80% "+q.p80.toFixed(dp);
+    [["20%",q.p20,"#8fbf8f"],["50%",q.p50,"#e0a53b"],["80%",q.p80,"#d47a7a"]].forEach(([lab,val,col])=>{
+      ml.push({yAxis:val, lineStyle:{type:"dashed",color:col,width:1},
+        label:{formatter:lab+"分位 "+val.toFixed(dp), color:col, position:"end", distance:4, fontSize:11}});
+    });
+  } else { sub.textContent=""; }
+  const dates=wpts.map(p=>p.date);
+  const mmap={}; mpts.forEach(p=>mmap[p.date]=p.value);
+  const el=echarts.init(document.getElementById(elId));
+  el.setOption({
+    grid:{left:8,right:96,top:30,bottom:24,containLabel:true},
+    legend:{top:0,data:[name+"（加权）","成分中位数"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis", valueFormatter:v=> v==null?"—":Number(v).toFixed(dp)},
+    xAxis:{type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}},
+    yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:[
+      {name:name+"（加权）",type:"line",showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#1d9e75"},
+        data:wpts.map(p=>p.value), markLine:{silent:true,symbol:"none",data:ml}},
+      {name:"成分中位数",type:"line",showSymbol:false,lineStyle:{width:1.5,type:"dashed"},itemStyle:{color:"#8a5cd1"},
+        data:dates.map(d=> d in mmap? mmap[d]:null), connectNulls:true},
+    ],
+  });
+  erpCharts.push(el);
+}
+
+// ERP 当前值百分位（前端直接从全量历史算）
+function _posWithin(points, latest, years){
+  let cut="0000-01-01";
+  if(years){ const d=new Date(); d.setDate(d.getDate()-Math.round(365*years)); cut=d.toISOString().slice(0,10); }
+  const vals=points.filter(p=>p.date>=cut).map(p=>p.value).filter(v=>v!=null).sort((a,b)=>a-b);
+  if(!vals.length) return null;
+  const below=vals.filter(v=>v<=latest).length;
+  return below/vals.length;
+}
+function erpAbsClass(v){ return v==null?"flat":(v>=6?"down":(v<=3?"up":"flat")); }  // 高=便宜=绿(down)，低=贵=红(up)
 
 async function drawCsi300Erp(){
   let close, erp, perc;
@@ -373,8 +448,21 @@ async function drawCsi300Erp(){
       loadCached("erp_api/csi300/percentiles.json"),
     ]);
   }catch(e){ return; }
-  const dates=close.points.map(p=>p.date);
-  const emap={}; erp.points.forEach(p=>emap[p.date]=p.value);
+  // 头部：当前 ERP + 近5年/近10年百分位（从全量历史算）
+  const erpAll=erp.points||[];
+  const cur=erpAll.length? erpAll[erpAll.length-1].value : null;
+  const p5=cur!=null? _posWithin(erpAll,cur,5):null;
+  const p10=cur!=null? _posWithin(erpAll,cur,10):null;
+  const head=document.getElementById("erphead");
+  if(head && cur!=null){
+    head.innerHTML='当前股权溢价指数 <b class="'+erpAbsClass(cur)+'">'+cur.toFixed(2)+'%</b>'+
+      '　近5年百分位 '+(p5==null?"—":Math.round(p5*100)+"%")+
+      '　近10年百分位 '+(p10==null?"—":Math.round(p10*100)+"%");
+  }
+  // 图（按显示范围裁剪）
+  const closeF=fltRange(close.points||[]), erpF=fltRange(erpAll);
+  const dates=closeF.map(p=>p.date);
+  const emap={}; erpF.forEach(p=>emap[p.date]=p.value);
   const c1=echarts.init(document.getElementById("erpc1"));
   c1.setOption({
     grid:{left:8,right:10,top:30,bottom:24,containLabel:true},
@@ -384,12 +472,12 @@ async function drawCsi300Erp(){
     yAxis:[{type:"value",scale:true,name:"点位",splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
            {type:"value",scale:true,name:"溢价%",splitLine:{show:false},axisLabel:{color:"#888"}}],
     series:[
-      {name:"沪深300",type:"line",yAxisIndex:0,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},data:close.points.map(p=>p.value)},
+      {name:"沪深300",type:"line",yAxisIndex:0,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},data:closeF.map(p=>p.value)},
       {name:"股权溢价指数",type:"line",yAxisIndex:1,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#d4537e"},data:dates.map(d=>emap[d]==null?null:emap[d]),connectNulls:true},
     ],
   });
   erpCharts.push(c1);
-  drawErpQuant("erpc2","erpsub2","股权溢价指数","#d4537e",erp.points.map(p=>p.date),erp.points,(perc.erp||{})["5y"],2,"%","近5年");
+  drawErpQuant("erpc2","erpsub2","股权溢价指数","#d4537e",erpF.map(p=>p.date),erpF,(perc.erp||{})["5y"],2,"%","近5年");
 }
 
 function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit, yrLabel){
@@ -413,8 +501,6 @@ function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit, yrLabe
   });
   erpCharts.push(el);
 }
-
-
 // ================== 金属模块（新增：概览分块 + 金/铜/锂走势） ==================
 const METAL_ORDER = ["gold","copper","lithium"];
 const METALS_RANGES = [["1m","近1月"],["6m","近6月"],["1y","近1年"],["all","全部"]];
