@@ -317,12 +317,18 @@ function renderValSubBar(){
 
 function valIdxMeta(){ return valIndexes.find(x=>x.id===curErpIdx)||{name:"",years:[5]}; }
 function valPosClass(pos){ return pos==null?"flat":(pos<0.3?"down":(pos>0.7?"up":"flat")); }  // 高分位=贵=红(up)，低=便宜=绿(down)
-function valCard(lab, L, M, pos){
-  const posTxt = pos==null? "—" : (Math.round(pos*100)+"%");
+function valCard(lab, L, compMed, pc){
+  const line=(y)=>{
+    const q=pc&&pc[y+"y"]; if(!q) return "";
+    const pos=q.cur_pos, posTxt=(pos==null?"—":Math.round(pos*100)+"%");
+    const med=(q.p50!=null?q.p50.toFixed(2):"—");
+    return '<div class="'+valPosClass(pos)+'" style="font-size:12.5px;margin-top:4px;font-weight:600">'+
+      '近'+y+'年百分位 '+posTxt+'，中位数 '+med+'</div>';
+  };
   return '<div class="card"><div class="nm">'+lab+'</div>'+
     '<div><span class="val">'+(L&&L.value!=null?L.value.toFixed(2):"—")+'</span></div>'+
-    '<div class="chg '+valPosClass(pos)+'">近'+valYear+'年百分位 '+posTxt+'</div>'+
-    '<div class="meta-line">成分股中位数 '+(M&&M.value!=null?M.value.toFixed(2):"—")+'</div></div>';
+    line(5)+line(10)+
+    '<div class="meta-line">成分股中位数 '+(compMed&&compMed.value!=null?compMed.value.toFixed(2):"—")+'</div></div>';
 }
 
 // 显示范围裁剪
@@ -346,8 +352,7 @@ async function renderValPane(){
   // 估值卡
   let html='<div class="grp-title">'+nm+' 估值</div><div class="grid">';
   [["pe","PE-TTM","pe_median"],["pb","PB","pb_median"],["ps","PS-TTM","ps_median"]].forEach(([m,lab,med])=>{
-    const q=(perc.metrics[m]||{})[valYear+"y"];
-    html+=valCard(lab, ov.latest[m], ov.latest[med], q?q.cur_pos:null);
+    html+=valCard(lab, ov.latest[m], ov.latest[med], perc.metrics[m]||{});
   });
   html+='</div>';
   // 时间范围（控制所有图的显示长度；分位线固定）
@@ -367,8 +372,8 @@ async function renderValPane(){
   }
   html+='<div class="erp-chart-sub" id="valsub"></div><div class="erp-chart" id="valchart"></div>';
   if(idx==="csi300"){
-    html+='<div class="erp-chart-title" style="margin-top:22px">沪深300 股权溢价指数（股债性价比）</div>';
-    html+='<div class="erp-chart-sub" id="erphead"></div>';
+    html+='<div class="erp-chart-title" style="margin-top:22px">股权溢价指数（股债性价比）</div>';
+    html+='<div id="erphead" style="margin:6px 0 10px"></div>';
     html+='<div class="erp-chart-sub">点位（左轴）+ 股权溢价指数%（右轴）</div><div class="erp-chart" id="erpc1"></div>';
     html+='<div class="erp-chart-sub" id="erpsub2"></div><div class="erp-chart" id="erpc2"></div>';
   }
@@ -454,9 +459,13 @@ async function drawCsi300Erp(){
   const p10=cur!=null? _posWithin(erpAll,cur,10):null;
   const head=document.getElementById("erphead");
   if(head && cur!=null){
-    head.innerHTML='当前股权溢价指数 <b class="'+erpAbsClass(cur)+'">'+cur.toFixed(2)+'%</b>'+
-      '　近5年百分位 '+(p5==null?"—":Math.round(p5*100)+"%")+
-      '　近10年百分位 '+(p10==null?"—":Math.round(p10*100)+"%");
+    const pcls=(pos)=> pos==null?"flat":(pos>=0.8?"down":(pos<=0.2?"up":"flat"));  // ERP高分位=便宜=绿(down)
+    const pl=(lab,pos)=> '<div class="'+pcls(pos)+'" style="font-size:12.5px;margin-top:4px;font-weight:600">'+
+      lab+' '+(pos==null?"—":Math.round(pos*100)+"%")+'</div>';
+    head.innerHTML='<div class="grid"><div class="card">'+
+      '<div class="nm">股权溢价指数</div>'+
+      '<div><span class="val '+pcls(p5)+'">'+cur.toFixed(2)+'%</span></div>'+
+      pl("近5年百分位",p5)+pl("近10年百分位",p10)+'</div></div>';
   }
   // 图（按显示范围裁剪）
   const closeF=fltRange(close.points||[]), erpF=fltRange(erpAll);
