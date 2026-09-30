@@ -322,7 +322,7 @@ function valCard(lab, L, compMed, pc){
     const q=pc&&pc[y+"y"]; if(!q) return "";
     const pos=q.cur_pos, posTxt=(pos==null?"—":Math.round(pos*100)+"%");
     const med=(q.p50!=null?q.p50.toFixed(2):"—");
-    return '<div class="'+valPosClass(pos)+'" style="font-size:12.5px;margin-top:4px;font-weight:600">'+
+    return '<div class="'+valPosClass(pos)+'" style="font-size:12px;margin-top:4px">'+
       '近'+y+'年百分位 '+posTxt+'，中位数 '+med+'</div>';
   };
   return '<div class="card"><div class="nm">'+lab+'</div>'+
@@ -464,7 +464,7 @@ async function drawCsi300Erp(){
       lab+' '+(pos==null?"—":Math.round(pos*100)+"%")+'</div>';
     head.innerHTML='<div class="grid"><div class="card">'+
       '<div class="nm">股权溢价指数</div>'+
-      '<div><span class="val '+pcls(p5)+'">'+cur.toFixed(2)+'%</span></div>'+
+      '<div><span class="val">'+cur.toFixed(2)+'%</span></div>'+
       pl("近5年百分位",p5)+pl("近10年百分位",p10)+'</div></div>';
   }
   // 图（按显示范围裁剪）
@@ -646,13 +646,23 @@ async function selectAgri(){
 function agriChgCls(v){ return v>0?"up":(v<0?"down":"flat"); }
 function agriChgTxt(v){ if(v==null) return "—"; return (v>0?"▲ +":(v<0?"▼ ":"— "))+Math.abs(v).toLocaleString(); }
 
+function agriPctEst(v,p20,p50,p80){
+  if(v==null||p20==null||p50==null) return null;
+  if(v<=p20) return 0.15;                                   // 20分位以下
+  if(v<=p50) return 0.2+(v-p20)/((p50-p20)||1)*0.3;
+  if(p80!=null && v<=p80) return 0.5+(v-p50)/((p80-p50)||1)*0.3;
+  return 0.9;
+}
 function renderAgri(){
   const pane=document.getElementById("pane");
   const ps=(agriOv.products||[]);
   let html='<div class="grid">';
   ps.forEach(p=>{
     const L=p.latest;
-    html+='<div class="card agri-card'+(p.id===agriOpen?' on':'')+'" data-pid="'+p.id+'" style="cursor:pointer">'+
+    const _pct=agriPctEst(L?L.value:null, p.p20, p.p50, p.p80);
+    const _low=(_pct!=null && _pct<0.3);
+    html+='<div class="card agri-card'+(p.id===agriOpen?' on':'')+'" data-pid="'+p.id+'" style="cursor:pointer;position:relative">'+
+      (_low?'<span style="position:absolute;top:10px;right:12px;background:#e1f0e9;color:#0f6e56;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px">低估</span>':'')+
       '<div class="nm">'+p.name+'</div>'+
       (L? '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+p.unit+'</span></div>'+
           '<div class="chg '+agriChgCls(p.change)+'">'+agriChgTxt(p.change)+'</div>'
@@ -676,7 +686,7 @@ function renderAgri(){
   });
   if(agriOpen){
     const rr=document.getElementById("agriRanges");
-    if(rr) rr.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ agriRange=el.dataset.r; drawAgriChart(agriOpen); });
+    if(rr) rr.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ agriRange=el.dataset.r; rr.querySelectorAll(".rg").forEach(x=>x.className="rg"); el.className="rg on"; drawAgriChart(agriOpen); });
     drawAgriChart(agriOpen);
   }
 }
