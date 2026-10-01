@@ -25,14 +25,15 @@ jobs:
         run: python3 ingest.py
       - name: 导出前端 JSON
         run: python3 export_json.py
-      - name: 提交数据与页面（无变化则跳过，不报错）
+      - name: 提交数据（同步远端 + 重试，容忍并发与偶发错误）
         run: |
           git config user.name  "github-actions"
           git config user.email "actions@github.com"
           git add -A
-          if git diff --cached --quiet; then
-            echo "本次无变化，跳过提交"
-          else
-            git commit -m "auto update $(TZ=Asia/Shanghai date +%F)"
-            git push
-          fi
+          if git diff --cached --quiet; then echo "无变化"; exit 0; fi
+          git commit -m "erp update $(TZ=Asia/Shanghai date +%F)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin main && { echo "推送成功"; exit 0; }
+            echo "推送失败，第 $i 次重试…"; sleep 10
+          done
+          echo "多次重试仍失败"; exit 1
