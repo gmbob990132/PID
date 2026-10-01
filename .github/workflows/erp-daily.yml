@@ -16,9 +16,15 @@ jobs:
       - run: pip install akshare
       - run: python3 erp_ingest.py
       - run: python3 erp_export.py
-      - name: 提交数据（无变化则跳过）
+      - name: 提交数据（同步远端 + 重试，容忍并发与偶发错误）
         run: |
           git config user.name  "github-actions"
           git config user.email "actions@github.com"
           git add -A
-          if git diff --cached --quiet; then echo "无变化"; else git commit -m "erp update $(TZ=Asia/Shanghai date +%F)" && git push; fi
+          if git diff --cached --quiet; then echo "无变化"; exit 0; fi
+          git commit -m "erp update $(TZ=Asia/Shanghai date +%F)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin main && { echo "推送成功"; exit 0; }
+            echo "推送失败，第 $i 次重试…"; sleep 10
+          done
+          echo "多次重试仍失败"; exit 1
