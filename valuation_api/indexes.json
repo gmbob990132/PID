@@ -1,1 +1,1 @@
-{"schema_version":1,"generated_at":"2026-10-01T01:52:31+00:00","indexes":[{"id":"csi300","name":"沪深300","years":[5,10]},{"id":"cyb","name":"创业板指","years":[5,10]},{"id":"star50","name":"科创50","years":[5]}]}
+{"schema_version":1,"generated_at":"2026-10-01T15:49:18+00:00","indexes":[{"id":"csi300","name":"沪深300","years":[5,10]},{"id":"cyb","name":"创业板指","years":[5,10]},{"id":"star50","name":"科创50","years":[5]}]}
