@@ -1,1 +1,1 @@
-{"schema_version":1,"generated_at":"2026-10-03T15:01:58+00:00","metric":{"id":"lc_spot_ind_mid","name":"碳酸锂现货·工业级","unit":"元/吨"},"range":"full","points":[{"date":"2026-09-24","value":127650.0},{"date":"2026-09-29","value":118250.0},{"date":"2026-09-30","value":117500.0}]}
+{"schema_version":1,"generated_at":"2026-10-04T15:36:27+00:00","metric":{"id":"lc_spot_ind_mid","name":"碳酸锂现货·工业级","unit":"元/吨"},"range":"full","points":[{"date":"2026-09-24","value":127650.0},{"date":"2026-09-29","value":118250.0},{"date":"2026-09-30","value":117500.0}]}
