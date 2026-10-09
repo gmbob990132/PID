@@ -122,8 +122,11 @@ def export(db_path, out_dir):
     lr = conn.execute("SELECT run_date,started_at,finished_at,n_total,n_ok,n_fail,detail FROM run_log ORDER BY id DESC LIMIT 1").fetchone()
     status = None
     if lr:
+        allf = json.loads(lr["detail"] or "{}")
+        short = {c: m for c, m in allf.items() if str(m).startswith("数据不足")}   # 新股 K 线不足，不算故障
+        failed = {c: m for c, m in allf.items() if c not in short}
         status = {"run_date": lr["run_date"], "finished_at": lr["finished_at"], "n_total": lr["n_total"],
-                  "n_ok": lr["n_ok"], "n_fail": lr["n_fail"], "failed": json.loads(lr["detail"] or "{}")}
+                  "n_ok": lr["n_ok"], "n_fail": len(failed), "failed": failed, "short": short}
     _write(os.path.join(out_dir, "macd", "meta.json"),
            {"schema_version": SCHEMA_VERSION, "generated_at": gen, "latest_date": latest,
             "dates": date_counts, "months": sorted(months), "states": STATE_RING,

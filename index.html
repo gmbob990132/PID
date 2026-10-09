@@ -871,6 +871,9 @@ function renderTechPane(){
     '<label><input type="checkbox" id="tSw"'+(techOnlySwitch?" checked":"")+'> 仅看当日发生切换的</label><span id="techCnt"></span></div>'+
     '<div class="tech-hint">「DIF-DEA 差距」= |DIFF−DEA| ÷ 收盘价，越小说明离金叉/死叉越近（也就是离状态切换越近）。点表头可排序。</div>'+
     '<div class="tbl-wrap"><table id="techTbl"></table></div>';
+  const shortCodes=Object.keys((st&&st.short)||{});
+  if(shortCodes.length) h+='<div class="tech-note">'+shortCodes.length+' 只新股上市时间太短（'+esc(shortCodes.map(c=>(techStocks[c]||{}).name||c).join("、"))+
+    '），K 线不足以计算 MACD，暂未纳入表格；积累够约 65 个交易日后会自动加入。</div>';
   if(st) h+='<div class="tech-note">数据更新于 '+esc((st.finished_at||"").replace("T"," ").slice(0,16))+'（北京时间）· 成功 '+st.n_ok+' / '+st.n_total+' 只</div>';
   pane.innerHTML=h;
 

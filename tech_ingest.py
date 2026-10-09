@@ -479,15 +479,20 @@ def run(db_path, csv_path, demo=False, only=None):
             fail[code] = str(e)[:160]
             print(f"  [{i:>4}/{len(codes)}] {code} ❌ {fail[code]}", flush=True)
 
+    # "数据不足"（新股上市不久，K 线不够预热 MACD）不是故障，单独归类，不计入失败
+    short = {c: m for c, m in fail.items() if m.startswith("数据不足")}
+    n_fail = len(fail) - len(short)
     conn.execute("INSERT INTO run_log(run_date,started_at,finished_at,n_total,n_ok,n_fail,detail) VALUES(?,?,?,?,?,?,?)",
                  (today.isoformat(), started.isoformat(timespec="seconds"),
-                  datetime.now(CN_TZ).isoformat(timespec="seconds"), len(codes), ok, len(fail),
+                  datetime.now(CN_TZ).isoformat(timespec="seconds"), len(codes), ok, n_fail,
                   json.dumps(fail, ensure_ascii=False)))
     conn.commit()
     conn.close()
-    print(f"\n完成：成功 {ok} / 失败 {len(fail)} / 共 {len(codes)}，用时 {time.time() - t0:.0f}s")
-    if fail:
-        print("失败清单:", json.dumps(fail, ensure_ascii=False)[:1500])
+    print(f"\n完成：成功 {ok} / 失败 {n_fail} / 新股数据不足 {len(short)} / 共 {len(codes)}，用时 {time.time() - t0:.0f}s")
+    if short:
+        print("数据不足(新股，积累够 K 线后自动加入):", json.dumps(short, ensure_ascii=False)[:800])
+    if n_fail:
+        print("失败清单:", json.dumps({c: m for c, m in fail.items() if c not in short}, ensure_ascii=False)[:1500])
     if codes and ok == 0:
         sys.exit(1)
 
