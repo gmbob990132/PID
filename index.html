@@ -122,6 +122,40 @@
   #techTbl .star{color:#e0a53b;margin-left:3px}
   #techTbl tr.sw td{background:#fbfaf5}
   .tech-hint{font-size:11.5px;color:var(--muted);margin:2px 2px 8px}
+
+  /* ===== 股票池管理 ===== */
+  .pool-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:8px 0;font-size:13px}
+  .pool-box h4{margin:0 0 6px;font-size:13.5px}
+  .pool-box ol{margin:6px 0 8px 18px;padding:0;color:var(--sec);line-height:1.7}
+  .pool-box input[type=password],.pool-box input[type=text],.pool-box textarea,.pool-in{border:1px solid var(--border2);border-radius:10px;
+    padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);background:#fff}
+  .pool-box input[type=password]{width:min(420px,100%)}
+  .pool-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pool-in{width:150px} .pool-in.nm{width:170px}
+  .tech-btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
+  .tech-btn.dng{color:var(--up);border-color:#e8b9b6}
+  .pool-pending{background:#fff6e0;border:1px solid #f0d9a0;border-radius:12px;padding:8px 14px;margin:8px 0;display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:13px;color:#8a5200}
+  .pool-msg{border-radius:10px;padding:8px 14px;margin:8px 0;font-size:13px}
+  .pool-msg.ok{background:#e6f4ea;border:1px solid #b9dfc3;color:#1e6b34}
+  .pool-msg.err{background:#fdeceb;border:1px solid #f1bdb9;color:#a3302b}
+  .pool-tag{font-size:11.5px;border-radius:999px;padding:1px 8px;white-space:nowrap}
+  .pool-tag.ok{background:#e6f4ea;color:#1e6b34} .pool-tag.wait{background:#fff6e0;color:#8a5200}
+  .pool-tag.off{background:#eee;color:#777} .pool-tag.del{background:#fdeceb;color:#a3302b}
+  .pool-tag.new{background:#e3eefc;color:#1b5cb8}
+  #poolTbl tr.pdel td{opacity:.55;text-decoration:line-through}
+  #poolTbl td:last-child,#poolTbl th:last-child{text-align:right}
+  .pool-prev td,.pool-prev th,#poolTbl td,#poolTbl th{text-align:left}
+  #poolTbl td:last-child,#poolTbl th:last-child{text-align:right}
+  .pool-star{cursor:pointer;color:#c9c5b8;font-size:16px;border:none;background:none;padding:0 6px}
+  .pool-star.on{color:#e0a53b}
+  .pool-modal{position:fixed;inset:0;background:rgba(20,24,32,.45);display:flex;align-items:flex-start;justify-content:center;
+    padding:5vh 12px;z-index:50;overflow:auto}
+  .pool-modal[hidden]{display:none}
+  .pool-card{background:var(--card);border-radius:16px;padding:18px 20px;width:min(760px,100%);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+  .pool-card h3{margin:0 0 4px;font-size:16px}
+  .pool-card textarea{width:100%;height:150px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+  .pool-prev{max-height:280px;overflow:auto;margin-top:10px;border:1px solid var(--border);border-radius:10px}
+  .pool-prev table{min-width:0}
 </style>
 </head>
 <body>
@@ -964,18 +998,301 @@ function techRenderTable(){
   });
 }
 
-function renderTechPool(pane){
-  if(!techStockList.length){ pane.innerHTML='<div class="empty">'+esc(techErr||"股票池数据还没有生成")+'</div>'; return; }
-  const on=techStockList.filter(s=>s.enabled), off=techStockList.filter(s=>!s.enabled);
-  let h='<div class="tech-note">共 '+on.length+' 只启用'+(off.length?'，'+off.length+' 只已停用（历史数据保留）':'')+
-    '。在线增删与批量导入将在下一阶段加入；目前请直接编辑仓库里的 <code>tech_config/stocks.csv</code>。</div>'+
-    '<div class="tbl-wrap"><table><thead><tr><th>名称 / 代码</th><th>市场</th><th>状态</th><th>加入日期</th></tr></thead><tbody>';
-  techStockList.forEach(s=>{
-    const stt=!s.enabled?'<span class="flat">已停用 '+esc(s.removed_at||"")+'</span>':(s.has_data?'<span class="down">正常</span>':'<span style="color:#8a5200">待计算</span>');
-    h+='<tr><td>'+esc(s.name||s.code)+(s.focus?'<span class="star" style="color:#e0a53b"> ★</span>':'')+'<small style="display:block;color:var(--muted);font-size:11.5px">'+esc(s.code)+'</small></td>'+
-      '<td>'+(s.market==="HK"?"港股":"A股")+'</td><td>'+stt+'</td><td>'+esc(s.added_at||"")+'</td></tr>';
+// ================== 股票池管理（增删/批量导入 → 提交 tech_config/stocks.csv → 触发 tech-daily） ==================
+const GH_OWNER="gmbob990132", GH_REPO="PID", GH_PATH="tech_config/stocks.csv";
+const POOL_CODE_RE=/^(\d{6}\.(SH|SZ|BJ)|\d{5}\.HK)$/;
+let poolOps={add:{},remove:{},focus:{}}, poolQ="", poolFilter="all", poolMsg=null, poolBusy=false, poolShowToken=false, ghTokenMem="";
+
+function ghToken(){ if(ghTokenMem) return ghTokenMem; try{ return localStorage.getItem("pid_gh_token")||""; }catch(e){ return ""; } }
+function ghSetToken(t){ ghTokenMem=t||""; try{ if(t) localStorage.setItem("pid_gh_token",t); else localStorage.removeItem("pid_gh_token"); }catch(e){} }
+function b64enc(str){ const bytes=new TextEncoder().encode(str); let bin=""; bytes.forEach(b=>bin+=String.fromCharCode(b)); return btoa(bin); }
+function b64dec(b){ const bin=atob(String(b).replace(/\s/g,"")); return new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))); }
+
+// ---- CSV ----
+function csvParse(text){
+  text=text.replace(/^﻿/,""); const rows=[]; let row=[],cur="",q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(cur); cur=""; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cur); cur=""; rows.push(row); row=[]; }
+    else cur+=c; }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(x=>x.trim()!==""));
+}
+function csvField(v){ v=String(v==null?"":v); return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function poolReadCsv(text){
+  const rows=csvParse(text), hdr=(rows.shift()||[]).map(x=>x.trim().toLowerCase());
+  const ic=hdr.indexOf("code"), inm=hdr.indexOf("name"), ifo=hdr.indexOf("focus"), seen=new Set(), out=[];
+  rows.forEach(r=>{ const code=(r[ic]||"").trim().toUpperCase(); if(!code||seen.has(code)) return; seen.add(code);
+    out.push({code,name:(inm>=0?(r[inm]||""):"").trim(),focus:(ifo>=0&&["1","是","true","y"].includes((r[ifo]||"").trim().toLowerCase()))?1:0}); });
+  return out;
+}
+function poolToCsv(list){ return "﻿code,name,focus\n"+list.map(r=>[r.code,r.name,r.focus?1:0].map(csvField).join(",")).join("\n")+"\n"; }
+function poolApplyOps(list,ops){
+  const m=new Map(list.map(r=>[r.code,Object.assign({},r)]));
+  Object.keys(ops.remove).forEach(c=>m.delete(c));
+  Object.entries(ops.add).forEach(([c,v])=>{ const ex=m.get(c);
+    if(ex){ if(v.name) ex.name=v.name; if(v.focus) ex.focus=1; } else m.set(c,{code:c,name:v.name||"",focus:v.focus?1:0}); });
+  Object.entries(ops.focus).forEach(([c,f])=>{ const ex=m.get(c); if(ex) ex.focus=f?1:0; });
+  return [...m.values()];
+}
+
+// ---- 代码规范化：支持 600031 / sh600031 / 600031.SS / 700 / HK00700 / 00700.HK ----
+function poolNormCode(t){
+  t=String(t||"").trim().replace(/^["']|["']$/g,"").toUpperCase(); if(!t) return {err:"空"};
+  let m;
+  if((m=t.match(/^(\d{6})\.(SH|SZ|BJ)$/))) return {code:t};
+  if((m=t.match(/^(\d{6})\.SS$/))) return {code:m[1]+".SH"};
+  if((m=t.match(/^(SH|SZ|BJ)(\d{6})$/))) return {code:m[2]+"."+m[1]};
+  if((m=t.match(/^(\d{1,5})\.HK$/))) return {code:m[1].padStart(5,"0")+".HK"};
+  if((m=t.match(/^HK(\d{1,5})$/))) return {code:m[1].padStart(5,"0")+".HK"};
+  if(/^\d{6}$/.test(t)){ const d=t[0];
+    if(d==="6") return {code:t+".SH"}; if(d==="0"||d==="3") return {code:t+".SZ"}; if(d==="4"||d==="8"||d==="9") return {code:t+".BJ"};
+    return {err:"无法判断交易所（基金/ETF 暂不支持）"}; }
+  if(/^\d{1,5}$/.test(t)) return {code:t.padStart(5,"0")+".HK"};
+  return {err:"不是有效的股票代码"};
+}
+// ---- 批量导入解析：CSV/文本行、纯代码、stock_list.yaml 都支持 ----
+function poolParseImport(text){
+  const items=[]; let pend=null;
+  const flush=()=>{ if(pend){ items.push(pend); pend=null; } };
+  const flagSet=new Set(["1","★","是","重点","focus","true"]);
+  text.replace(/^﻿/,"").split(/\r?\n/).forEach(line=>{
+    const raw=line; line=line.replace(/#.*$/,"").trim(); if(!line) return;
+    if(/^(a_share|hk_stock)\s*:\s*$/i.test(line)) return;
+    let m;
+    if((m=line.match(/^-?\s*code\s*:\s*["']?([^"'\s,]+)["']?/i))){ flush(); pend={raw,codeRaw:m[1],name:"",focus:0}; return; }
+    if((m=line.match(/^name\s*:\s*["']?(.*?)["']?\s*$/i)) && pend){ pend.name=m[1]; flush(); return; }
+    if(/^(code|代码|股票代码)\s*[,，\t]/i.test(line)) return;   // 表头行（英文/中文）
+    flush();
+    let tok=line.split(/[,，\t;；\s]+/).filter(Boolean), focus=0;
+    if(tok.length>1 && flagSet.has(tok[tok.length-1].toLowerCase())){ focus=1; tok=tok.slice(0,-1); }
+    if(tok.length>1 && tok.every(t=>poolNormCode(t).code)){ tok.forEach(t=>items.push({raw,codeRaw:t,name:"",focus})); return; }
+    items.push({raw,codeRaw:tok[0],name:tok.slice(1).join(" "),focus});
   });
-  pane.innerHTML=h+'</tbody></table></div>';
+  flush();
+  const seen=new Set();
+  return items.map(it=>{ const n=poolNormCode(it.codeRaw); const o={codeRaw:it.codeRaw,name:it.name,focus:it.focus};
+    if(n.err){ o.status="invalid"; o.note=n.err; return o; }
+    o.code=n.code; if(!POOL_CODE_RE.test(o.code)){ o.status="invalid"; o.note="代码格式不对"; return o; }
+    if(seen.has(o.code)){ o.status="dup"; o.note="本次导入里重复"; return o; }
+    seen.add(o.code);
+    const ex=techStockList.find(x=>x.code===o.code);
+    const pendingAdd=poolOps.add[o.code], pendingRm=poolOps.remove[o.code];
+    if(pendingAdd){ o.status="exists"; o.note="已在待提交的新增里"; }
+    else if(ex&&ex.enabled&&!pendingRm){ o.status="exists"; o.note="已在股票池中，跳过"; }
+    else if(ex&&(!ex.enabled||pendingRm)){ o.status="restore"; o.note="之前删除过，将恢复（历史数据保留）"; if(!o.name) o.name=ex.name; }
+    else o.status="new";
+    return o; });
+}
+
+// ---- 暂存修改 ----
+function poolExisting(code){ return techStockList.find(x=>x.code===code); }
+function poolStageAdd(code,name,focus){
+  if(poolOps.remove[code]){ delete poolOps.remove[code]; return "restored"; }
+  const ex=poolExisting(code); if(ex&&ex.enabled) return "exists";
+  poolOps.add[code]={name:name||"",focus:focus?1:0}; return "added";
+}
+function poolStageRemove(code){
+  if(poolOps.add[code]){ delete poolOps.add[code]; return; }
+  delete poolOps.focus[code];
+  const ex=poolExisting(code); if(ex&&ex.enabled) poolOps.remove[code]=1;
+}
+function poolStageFocus(code,f){
+  if(poolOps.add[code]){ poolOps.add[code].focus=f?1:0; return; }
+  const ex=poolExisting(code); if(ex&&!!ex.focus===!!f) delete poolOps.focus[code]; else poolOps.focus[code]=f?1:0;
+}
+function poolPendingCount(){ return Object.keys(poolOps.add).length+Object.keys(poolOps.remove).length+Object.keys(poolOps.focus).length; }
+
+// ---- GitHub 读写 ----
+async function ghFetch(path,opts){
+  opts=opts||{}; const h={"Accept":"application/vnd.github+json","Authorization":"Bearer "+ghToken(),"X-GitHub-Api-Version":"2022-11-28"};
+  if(opts.body) h["Content-Type"]="application/json";
+  return fetch("https://api.github.com"+path,Object.assign({},opts,{headers:h}));
+}
+function ghErr(status){
+  if(status===401) return "令牌无效或已过期，请重新设置令牌。";
+  if(status===403) return "权限不足：令牌需要这个仓库的 Contents: Read and write 权限。";
+  if(status===404) return "找不到文件或令牌无权访问仓库 "+GH_OWNER+"/"+GH_REPO+"（创建令牌时要选中这个仓库）。";
+  return "GitHub 返回 HTTP "+status+"。";
+}
+async function poolVerifyToken(){
+  const r=await ghFetch("/repos/"+GH_OWNER+"/"+GH_REPO);
+  if(!r.ok) throw new Error(ghErr(r.status));
+  const j=await r.json(); if(!j.permissions||!j.permissions.push) throw new Error("令牌只有只读权限，需要 Contents: Read and write。");
+}
+async function poolSave(){
+  if(poolBusy||!poolPendingCount()) return;
+  if(!ghToken()){ poolShowToken=true; poolMsg={t:"err",m:"请先设置 GitHub 令牌，然后再点保存。"}; renderTechPool(document.getElementById("pane")); return; }
+  poolBusy=true; poolMsg={t:"ok",m:"正在提交到 GitHub…"}; renderTechPool(document.getElementById("pane"));
+  try{
+    const nA=Object.keys(poolOps.add).length, nR=Object.keys(poolOps.remove).length, nF=Object.keys(poolOps.focus).length;
+    let done=null;
+    for(let attempt=0;attempt<3&&!done;attempt++){
+      const g=await ghFetch("/repos/"+GH_OWNER+"/"+GH_REPO+"/contents/"+GH_PATH);
+      if(!g.ok) throw new Error(ghErr(g.status));
+      const cur=await g.json();
+      const list=poolApplyOps(poolReadCsv(b64dec(cur.content)),poolOps);
+      if(!list.length) throw new Error("提交后股票池会变成空的，已拒绝（至少保留一只股票）。");
+      const parts=[]; if(nA) parts.push("+"+nA); if(nR) parts.push("-"+nR); if(nF) parts.push("★"+nF);
+      const put=await ghFetch("/repos/"+GH_OWNER+"/"+GH_REPO+"/contents/"+GH_PATH,{method:"PUT",
+        body:JSON.stringify({message:"tech pool: "+parts.join(" ")+" (via web)",content:b64enc(poolToCsv(list)),sha:cur.sha})});
+      if(put.status===409||put.status===422) continue;      // 文件在期间被改过，重新读取后再套用一次
+      if(!put.ok) throw new Error(ghErr(put.status));
+      done=await put.json();
+    }
+    if(!done) throw new Error("文件在提交过程中被反复修改，请稍后重试。");
+    const today=new Date().toISOString().slice(0,10);
+    Object.keys(poolOps.remove).forEach(c=>{ const x=poolExisting(c); if(x){ x.enabled=0; x.removed_at=today; } });
+    Object.entries(poolOps.add).forEach(([c,v])=>{ const x=poolExisting(c);
+      if(x){ x.enabled=1; x.removed_at=null; if(v.name) x.name=v.name; if(v.focus) x.focus=1; }
+      else techStockList.push({code:c,name:v.name||"",market:c.endsWith(".HK")?"HK":"A",focus:v.focus?1:0,enabled:1,added_at:today,removed_at:null,has_data:false}); });
+    Object.entries(poolOps.focus).forEach(([c,f])=>{ const x=poolExisting(c); if(x) x.focus=f?1:0; });
+    techStockList.forEach(x=>techStocks[x.code]=x);
+    poolOps={add:{},remove:{},focus:{}};
+    const url=(done.commit&&done.commit.html_url)||"";
+    poolMsg={t:"ok",m:"已提交到 GitHub。tech-daily 会自动运行，大约 5 分钟后刷新本页就能看到新股票的数据；在此之前新增的股票显示“待计算”。",
+      link:url, actions:"https://github.com/"+GH_OWNER+"/"+GH_REPO+"/actions/workflows/tech-daily.yml"};
+  }catch(e){ poolMsg={t:"err",m:"保存失败："+e.message}; }
+  poolBusy=false; renderTechPool(document.getElementById("pane"));
+}
+
+// ---- 渲染 ----
+function poolView(){
+  const rows=[], rm=poolOps.remove, ad=poolOps.add, fo=poolOps.focus, short=(techMeta&&techMeta.status&&techMeta.status.short)||{};
+  Object.entries(ad).forEach(([c,v])=>{ const ex=poolExisting(c);
+    rows.push({code:c,name:v.name||(ex&&ex.name)||"",market:c.endsWith(".HK")?"HK":"A",focus:v.focus,added_at:"",tag:ex?["new","待恢复"]:["new","待添加"],pending:true,cls:""}); });
+  techStockList.forEach(s=>{
+    if(ad[s.code]) return;
+    const foc=(s.code in fo)?fo[s.code]:s.focus;
+    let tag, cls="";
+    if(rm[s.code]){ tag=["del","待删除"]; cls="pdel"; }
+    else if(!s.enabled) tag=["off","已停用"];
+    else if(short[s.code]) tag=["wait","新股·K线不足"];
+    else if(!s.has_data) tag=["wait","待计算"];
+    else tag=["ok","正常"];
+    rows.push({code:s.code,name:s.name,market:s.market,focus:foc,added_at:s.added_at,removed_at:s.removed_at,tag,cls,enabled:s.enabled,pending:!!rm[s.code]||(s.code in fo)});
+  });
+  return rows;
+}
+function poolRenderTable(){
+  const q=poolQ.trim().toLowerCase(); let rows=poolView();
+  const fl=poolFilter;
+  rows=rows.filter(r=>(!q||(r.name||"").toLowerCase().includes(q)||r.code.toLowerCase().includes(q))&&
+    (fl==="all"||(fl==="on"&&r.tag[1]!=="已停用")||(fl==="off"&&r.tag[1]==="已停用")||(fl==="wait"&&/待|不足/.test(r.tag[1]))||(fl==="focus"&&r.focus)));
+  let h='<thead><tr><th>名称 / 代码</th><th>市场</th><th>状态</th><th>加入日期</th><th>重点</th><th>操作</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const isDel=r.tag[1]==="待删除", isOff=r.tag[1]==="已停用";
+    const act=isDel?'<button class="tech-btn" data-a="undo" data-c="'+esc(r.code)+'">撤销</button>':
+      (isOff?'<button class="tech-btn" data-a="restore" data-c="'+esc(r.code)+'">恢复</button>':
+      '<button class="tech-btn dng" data-a="del" data-c="'+esc(r.code)+'">删除</button>');
+    h+='<tr class="'+r.cls+'"><td>'+esc(r.name||r.code)+'<small style="display:block;color:var(--muted);font-size:11.5px">'+esc(r.code)+'</small></td>'+
+      '<td>'+(r.market==="HK"?"港股":"A股")+'</td><td><span class="pool-tag '+r.tag[0]+'">'+r.tag[1]+'</span>'+
+      (isOff&&r.removed_at?'<small style="display:block;color:var(--muted)">'+esc(r.removed_at)+'</small>':'')+'</td>'+
+      '<td>'+esc(r.added_at||"")+'</td>'+
+      '<td><button class="pool-star'+(r.focus?" on":"")+'" data-a="star" data-c="'+esc(r.code)+'" title="标记重点关注">'+(r.focus?"★":"☆")+'</button></td><td>'+act+'</td></tr>';
+  });
+  if(!rows.length) h+='<tr><td colspan="6" class="empty">没有符合条件的股票</td></tr>';
+  const t=document.getElementById("poolTbl"); t.innerHTML=h+'</tbody>';
+  document.getElementById("poolCnt").textContent="显示 "+rows.length+" 只";
+  t.querySelectorAll("button[data-a]").forEach(b=>b.onclick=()=>{
+    const c=b.dataset.c, a=b.dataset.a;
+    if(a==="del") poolStageRemove(c);
+    else if(a==="undo") delete poolOps.remove[c];
+    else if(a==="restore") poolStageAdd(c,"",0);
+    else if(a==="star"){ const v=poolView().find(x=>x.code===c); poolStageFocus(c,!(v&&v.focus)); }
+    poolMsg=null; renderTechPool(document.getElementById("pane"));
+  });
+}
+function renderTechPool(pane){
+  if(!techStockList.length){ pane.innerHTML='<div class="empty">'+esc(techErr||"股票池数据还没有生成，请先运行一次 tech-daily。")+'</div>'; return; }
+  const view=poolView(), nOn=view.filter(r=>r.tag[1]!=="已停用").length, nOff=view.length-nOn;
+  const tok=!!ghToken(), nA=Object.keys(poolOps.add).length, nR=Object.keys(poolOps.remove).length, nF=Object.keys(poolOps.focus).length, np=poolPendingCount();
+  let h='<div class="pool-row" style="margin:6px 0"><span class="lab" style="font-size:13px;color:var(--sec)">共 '+nOn+' 只启用'+(nOff?'，'+nOff+' 只已停用（历史保留）':'')+'</span>'+
+    '<span style="margin-left:auto" class="pool-row"><span class="pool-tag '+(tok?'ok':'off')+'">'+(tok?'GitHub 令牌已设置':'未设置令牌')+'</span>'+
+    '<button class="tech-btn" id="pTokBtn">'+(tok?'更换/清除令牌':'设置令牌')+'</button></span></div>';
+  if(poolShowToken){
+    h+='<div class="pool-box"><h4>设置 GitHub 令牌（只需一次，只保存在这个浏览器里）</h4><ol>'+
+      '<li>打开 GitHub → 右上角头像 → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token</li>'+
+      '<li>Repository access 选 <b>Only select repositories</b>，只选 <b>'+GH_REPO+'</b></li>'+
+      '<li>Permissions → Repository permissions → <b>Contents: Read and write</b>（其余都不要）；有效期建议 90 天</li>'+
+      '<li>生成后复制令牌（以 github_pat_ 开头），粘贴到下面</li></ol>'+
+      '<div class="pool-row"><input type="password" id="pTok" placeholder="github_pat_…" autocomplete="off"><button class="tech-btn pri" id="pTokSave">验证并保存</button>'+
+      (tok?'<button class="tech-btn dng" id="pTokClear">清除已保存的令牌</button>':'')+'</div>'+
+      '<div class="tech-note">令牌只存在本浏览器的 localStorage，不会发给除 GitHub 以外的任何地方。请勿在公用电脑上保存；随时可在 GitHub 里撤销。</div></div>';
+  }
+  if(poolMsg) h+='<div class="pool-msg '+poolMsg.t+'">'+esc(poolMsg.m)+
+    (poolMsg.link?' <a href="'+esc(poolMsg.link)+'" target="_blank" rel="noopener">查看提交</a>':'')+
+    (poolMsg.actions?' · <a href="'+esc(poolMsg.actions)+'" target="_blank" rel="noopener">查看运行进度</a>':'')+'</div>';
+  h+='<div class="pool-box"><div class="pool-row"><b style="font-size:13px">添加股票</b>'+
+    '<input class="pool-in" id="pCode" placeholder="代码，如 600031 / 00700"><input class="pool-in nm" id="pName" placeholder="名称（可不填，自动补）">'+
+    '<label style="font-size:13px"><input type="checkbox" id="pFocus"> 重点</label>'+
+    '<button class="tech-btn pri" id="pAdd">添加</button><button class="tech-btn" id="pImport" style="margin-left:auto">批量导入…</button></div>'+
+    '<div class="tech-note">代码可以只写数字（自动判断沪/深/北/港），也支持 sh600031、600031.SS、HK00700 等写法。</div></div>';
+  if(np) h+='<div class="pool-pending"><b>待提交 '+np+' 项修改</b><span>'+(nA?'新增 '+nA+'　':'')+(nR?'删除 '+nR+'　':'')+(nF?'重点标记 '+nF:'')+'</span>'+
+    '<span style="margin-left:auto" class="pool-row"><button class="tech-btn" id="pDiscard">放弃</button><button class="tech-btn pri" id="pSave"'+(poolBusy?' disabled':'')+'>保存并更新</button></span></div>';
+  h+='<div class="tech-tools"><input class="tech-q" id="pQ" placeholder="搜索名称或代码" value="'+esc(poolQ)+'">'+
+    '<select class="pool-in" id="pFilter" style="width:auto">'+[["all","全部"],["on","启用中"],["wait","待计算"],["off","已停用"],["focus","仅重点"]].map(([k,l])=>'<option value="'+k+'"'+(poolFilter===k?' selected':'')+'>'+l+'</option>').join("")+'</select>'+
+    '<span id="poolCnt"></span></div><div class="tbl-wrap"><table id="poolTbl"></table></div>'+
+    '<div class="tech-note">删除不会丢历史数据，只是停用；以后“恢复”即可。保存会修改仓库里的 tech_config/stocks.csv 并自动触发更新。</div>'+
+    '<div class="pool-modal" id="poolModal" hidden><div class="pool-card"><h3>批量导入</h3>'+
+    '<div class="tech-note" style="margin-top:0">粘贴代码清单，或选择 .csv / .txt / .yaml 文件（你原来的 stock_list.yaml 可以直接导入）。每行一只：<code>代码,名称</code>，或只写代码；行尾加 <code>★</code> 表示重点。</div>'+
+    '<textarea id="pText" placeholder="600031,三一重工&#10;00700,腾讯控股&#10;300750&#10;- code: &quot;002594.SZ&quot;&#10;  name: &quot;比亚迪&quot;"></textarea>'+
+    '<div class="pool-row" style="margin-top:8px"><input type="file" id="pFile" accept=".csv,.txt,.yaml,.yml,text/*">'+
+    '<label style="font-size:13px"><input type="checkbox" id="pReplace"> 替换整个股票池（清单里没有的会被停用）</label>'+
+    '<button class="tech-btn" id="pParse" style="margin-left:auto">解析预览</button></div>'+
+    '<div id="pPrev"></div><div class="pool-row" style="margin-top:12px;justify-content:flex-end"><button class="tech-btn" id="pCancel">关闭</button>'+
+    '<button class="tech-btn pri" id="pStage" disabled>加入待提交</button></div></div></div>';
+  pane.innerHTML=h;
+  poolRenderTable();
+
+  document.getElementById("pTokBtn").onclick=()=>{ poolShowToken=!poolShowToken; poolMsg=null; renderTechPool(pane); };
+  const ts=document.getElementById("pTokSave");
+  if(ts) ts.onclick=async()=>{ const v=document.getElementById("pTok").value.trim(); if(!v) return;
+    ghSetToken(v); poolMsg={t:"ok",m:"正在验证…"}; renderTechPool(pane);
+    try{ await poolVerifyToken(); poolShowToken=false; poolMsg={t:"ok",m:"令牌验证通过，可以保存修改了。"}; }
+    catch(e){ ghSetToken(""); poolShowToken=true; poolMsg={t:"err",m:e.message}; }
+    renderTechPool(pane); };
+  const tc=document.getElementById("pTokClear"); if(tc) tc.onclick=()=>{ ghSetToken(""); poolMsg={t:"ok",m:"已清除令牌。"}; renderTechPool(pane); };
+  document.getElementById("pAdd").onclick=()=>{
+    const n=poolNormCode(document.getElementById("pCode").value);
+    if(n.err||!POOL_CODE_RE.test(n.code||"")){ poolMsg={t:"err",m:"代码无效："+(n.err||"格式不对")}; renderTechPool(pane); return; }
+    const r=poolStageAdd(n.code,document.getElementById("pName").value.trim(),document.getElementById("pFocus").checked);
+    poolMsg=r==="exists"?{t:"err",m:n.code+" 已经在股票池里了。"}:{t:"ok",m:(r==="restored"?"已撤销删除 ":"已加入待提交：")+n.code+"。确认无误后点“保存并更新”。"};
+    renderTechPool(pane); };
+  const sv=document.getElementById("pSave"); if(sv) sv.onclick=poolSave;
+  const dc=document.getElementById("pDiscard"); if(dc) dc.onclick=()=>{ poolOps={add:{},remove:{},focus:{}}; poolMsg=null; renderTechPool(pane); };
+  document.getElementById("pQ").oninput=e=>{ poolQ=e.target.value; poolRenderTable(); };
+  document.getElementById("pFilter").onchange=e=>{ poolFilter=e.target.value; poolRenderTable(); };
+  // 批量导入弹窗
+  const modal=document.getElementById("poolModal"); let parsed=[];
+  document.getElementById("pImport").onclick=()=>{ modal.hidden=false; };
+  document.getElementById("pCancel").onclick=()=>{ modal.hidden=true; };
+  document.getElementById("pFile").onchange=async e=>{ const f=e.target.files[0]; if(f) document.getElementById("pText").value=await f.text(); };
+  document.getElementById("pParse").onclick=()=>{
+    parsed=poolParseImport(document.getElementById("pText").value);
+    const cnt={new:0,restore:0,exists:0,invalid:0,dup:0}; parsed.forEach(x=>cnt[x.status]++);
+    const lab={new:["new","新增"],restore:["wait","恢复"],exists:["off","已有"],invalid:["del","无效"],dup:["off","重复"]};
+    let p='<div class="tech-note">共识别 '+parsed.length+' 行：新增 '+cnt.new+'，恢复 '+cnt.restore+'，已有 '+cnt.exists+'，重复 '+cnt.dup+'，无效 '+cnt.invalid+'</div>';
+    if(parsed.length){ p+='<div class="pool-prev"><table><thead><tr><th>结果</th><th>代码</th><th>名称</th><th>说明</th></tr></thead><tbody>';
+      parsed.forEach(x=>{ const l=lab[x.status]; p+='<tr><td><span class="pool-tag '+l[0]+'">'+l[1]+'</span></td><td>'+esc(x.code||x.codeRaw)+'</td><td>'+esc(x.name||"")+(x.focus?' ★':'')+'</td><td style="text-align:left">'+esc(x.note||"")+'</td></tr>'; });
+      p+='</tbody></table></div>'; }
+    document.getElementById("pPrev").innerHTML=p;
+    document.getElementById("pStage").disabled=!(cnt.new+cnt.restore>0 || (document.getElementById("pReplace").checked&&cnt.new+cnt.restore+cnt.exists>0));
+  };
+  document.getElementById("pStage").onclick=()=>{
+    const rep=document.getElementById("pReplace").checked;
+    const ok=parsed.filter(x=>x.status==="new"||x.status==="restore"), keep=new Set(parsed.filter(x=>x.code&&x.status!=="invalid"&&x.status!=="dup").map(x=>x.code));
+    let toRemove=[];
+    if(rep){ toRemove=techStockList.filter(s=>s.enabled&&!keep.has(s.code)&&!poolOps.add[s.code]).map(s=>s.code);
+      if(!keep.size){ alert("导入清单里没有有效代码，已取消。"); return; }
+      if(toRemove.length&&!confirm("“替换整个股票池”会停用 "+toRemove.length+" 只不在清单里的股票（历史数据保留，可恢复）。确定吗？")) return; }
+    ok.forEach(x=>poolStageAdd(x.code,x.name,x.focus));
+    parsed.filter(x=>x.status==="exists"&&x.focus&&poolExisting(x.code)).forEach(x=>poolStageFocus(x.code,1));
+    toRemove.forEach(c=>poolStageRemove(c));
+    modal.hidden=true; poolMsg={t:"ok",m:"已加入待提交：新增/恢复 "+ok.length+" 只"+(toRemove.length?"，停用 "+toRemove.length+" 只":"")+"。确认无误后点“保存并更新”。"};
+    renderTechPool(pane); };
 }
 
 window.addEventListener("resize", ()=>{
