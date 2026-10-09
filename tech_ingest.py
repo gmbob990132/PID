@@ -19,6 +19,8 @@
   python3 tech_ingest.py --demo          # 用合成数据跑通全流程 → data/tech_demo.db（不联网）
   python3 tech_ingest.py --selftest      # 离线自检
   python3 tech_ingest.py --only 600031.SH,00700.HK   # 只处理指定代码（调试）
+  python3 tech_ingest.py --new-only      # 快速模式：只处理新加入/恢复的、以及库里还没有数据的股票
+                                         #（页面改股票池触发的运行用它；定时任务仍是全量）
 
 表：
   stocks(code,name,market,focus,enabled,added_at,removed_at)
@@ -365,13 +367,17 @@ def sync_stocks(conn, csv_path, today, demo=False):
         raise RuntimeError(f"{csv_path} 里没有有效股票，已中止（避免把全部股票停用）")
     in_csv = {r["code"] for r in rows}
     cur = {r[0]: r for r in conn.execute("SELECT code,name,enabled FROM stocks")}
+    touched = set()          # 本次新加入、或从停用恢复的代码（--new-only 模式只处理它们）
     for r in rows:
         mkt = "HK" if r["code"].endswith(".HK") else "A"
         if r["code"] in cur:
             name = r["name"] or cur[r["code"]][1] or ""
+            if not cur[r["code"]][2]:
+                touched.add(r["code"])
             conn.execute("UPDATE stocks SET name=?,focus=?,enabled=1,removed_at=NULL,market=? WHERE code=?",
                          (name, r["focus"], mkt, r["code"]))
         else:
+            touched.add(r["code"])
             conn.execute("INSERT INTO stocks(code,name,market,focus,enabled,added_at) VALUES(?,?,?,?,1,?)",
                          (r["code"], r["name"], mkt, r["focus"], today))
     for code, (_, _, enabled) in cur.items():
@@ -384,7 +390,7 @@ def sync_stocks(conn, csv_path, today, demo=False):
         for c, n in got.items():
             conn.execute("UPDATE stocks SET name=? WHERE code=?", (n, c))
         conn.commit()
-    return len(rows)
+    return len(rows), touched
 
 
 _R = lambda x, n: None if x is None or pd.isna(x) else round(float(x), n)  # noqa: E731
@@ -452,15 +458,26 @@ def process_stock(conn, code, demo=False, today=None):
 # ============================================================
 # 主流程
 # ============================================================
-def run(db_path, csv_path, demo=False, only=None):
+def run(db_path, csv_path, demo=False, only=None, new_only=False):
     started = datetime.now(CN_TZ)
     today = started.date()
     conn = open_db(db_path)
-    n = sync_stocks(conn, csv_path, today.isoformat(), demo=demo)
+    n, touched = sync_stocks(conn, csv_path, today.isoformat(), demo=demo)
     codes = [r[0] for r in conn.execute("SELECT code FROM stocks WHERE enabled=1 ORDER BY market DESC, code")]
+    n_enabled = len(codes)
     if only:
         codes = [c for c in codes if c in only]
-    print(f"股票池 CSV {n} 只；启用 {len(codes)} 只；数据库 {db_path}")
+    if new_only:
+        # 快速模式：只处理新加入/恢复的，以及库里还没有任何行情数据的（例如之前因新股K线不足而跳过的）
+        has = {r[0] for r in conn.execute("SELECT DISTINCT code FROM macd_daily")}
+        codes = [c for c in codes if c in touched or c not in has]
+        print(f"股票池 CSV {n} 只；启用 {n_enabled} 只；【快速模式】只处理 {len(codes)} 只新加入/待计算的；数据库 {db_path}")
+        if not codes:
+            print("没有需要计算的新股票（可能只是删除了股票），已同步股票池。")
+            conn.close()
+            return
+    else:
+        print(f"股票池 CSV {n} 只；启用 {len(codes)} 只；数据库 {db_path}")
     if not demo and any(not c.endswith(".HK") for c in codes) and not os.environ.get("TUSHARE_TOKEN"):
         print("❌ 有 A 股但 TUSHARE_TOKEN 未设置")
         sys.exit(1)
@@ -482,10 +499,11 @@ def run(db_path, csv_path, demo=False, only=None):
     # "数据不足"（新股上市不久，K 线不够预热 MACD）不是故障，单独归类，不计入失败
     short = {c: m for c, m in fail.items() if m.startswith("数据不足")}
     n_fail = len(fail) - len(short)
-    conn.execute("INSERT INTO run_log(run_date,started_at,finished_at,n_total,n_ok,n_fail,detail) VALUES(?,?,?,?,?,?,?)",
-                 (today.isoformat(), started.isoformat(timespec="seconds"),
-                  datetime.now(CN_TZ).isoformat(timespec="seconds"), len(codes), ok, n_fail,
-                  json.dumps(fail, ensure_ascii=False)))
+    if not new_only:   # 快速模式不写 run_log，避免页面“成功 N/N”被一次小范围运行覆盖
+        conn.execute("INSERT INTO run_log(run_date,started_at,finished_at,n_total,n_ok,n_fail,detail) VALUES(?,?,?,?,?,?,?)",
+                     (today.isoformat(), started.isoformat(timespec="seconds"),
+                      datetime.now(CN_TZ).isoformat(timespec="seconds"), len(codes), ok, n_fail,
+                      json.dumps(fail, ensure_ascii=False)))
     conn.commit()
     conn.close()
     print(f"\n完成：成功 {ok} / 失败 {n_fail} / 新股数据不足 {len(short)} / 共 {len(codes)}，用时 {time.time() - t0:.0f}s")
@@ -493,7 +511,7 @@ def run(db_path, csv_path, demo=False, only=None):
         print("数据不足(新股，积累够 K 线后自动加入):", json.dumps(short, ensure_ascii=False)[:800])
     if n_fail:
         print("失败清单:", json.dumps({c: m for c, m in fail.items() if c not in short}, ensure_ascii=False)[:1500])
-    if codes and ok == 0:
+    if codes and ok == 0 and not new_only:
         sys.exit(1)
 
 
@@ -536,6 +554,33 @@ def selftest():
     conn = sqlite3.connect(dbp)
     assert conn.execute("SELECT enabled FROM stocks WHERE code='00700.HK'").fetchone()[0] == 0
     assert conn.execute("SELECT COUNT(*) FROM macd_daily WHERE code='00700.HK'").fetchone()[0] > 300
+    # 4b) 快速模式：只处理新加入/恢复的，其他股票的数据一行都不动，也不写 run_log
+    conn.close()
+    with open(csvp, "w", encoding="utf-8-sig") as f:
+        f.write("code,name,focus\n600031.SH,三一重工,1\n000063.SZ,中兴通讯,0\n")
+    conn = sqlite3.connect(dbp)
+    base = conn.execute("SELECT * FROM macd_daily WHERE code='600031.SH' ORDER BY date").fetchall()
+    logs0 = conn.execute("SELECT COUNT(*) FROM run_log").fetchone()[0]
+    conn.close()
+    run(dbp, csvp, demo=True, new_only=True)
+    conn = sqlite3.connect(dbp)
+    assert conn.execute("SELECT * FROM macd_daily WHERE code='600031.SH' ORDER BY date").fetchall() == base
+    assert conn.execute("SELECT COUNT(*) FROM macd_daily WHERE code='000063.SZ'").fetchone()[0] > 300   # 新股票已算
+    assert conn.execute("SELECT COUNT(*) FROM run_log").fetchone()[0] == logs0                          # 不写 run_log
+    conn.close()
+    # 恢复一只之前停用的：快速模式也要处理它
+    with open(csvp, "w", encoding="utf-8-sig") as f:
+        f.write("code,name,focus\n600031.SH,三一重工,1\n000063.SZ,中兴通讯,0\n00700.HK,,0\n")
+    run(dbp, csvp, demo=True, new_only=True)
+    conn = sqlite3.connect(dbp)
+    assert conn.execute("SELECT enabled FROM stocks WHERE code='00700.HK'").fetchone()[0] == 1
+    # 只删除股票：快速模式下什么都不拉，但股票池已同步
+    with open(csvp, "w", encoding="utf-8-sig") as f:
+        f.write("code,name,focus\n600031.SH,三一重工,1\n")
+    conn.close()
+    run(dbp, csvp, demo=True, new_only=True)
+    conn = sqlite3.connect(dbp)
+    assert conn.execute("SELECT COUNT(*) FROM stocks WHERE enabled=1").fetchone()[0] == 1
     # 5) 周线只含已收完的周
     d = pd.DataFrame({"date": pd.bdate_range("2026-09-01", "2026-10-07"), "close": 1.0})  # 最新为周三
     w = to_weekly_complete(d)
@@ -550,11 +595,12 @@ def main():
     ap.add_argument("--demo", action="store_true")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--only", default="")
+    ap.add_argument("--new-only", action="store_true", help="快速模式：只处理新加入/恢复/尚无数据的股票")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
     db = a.db or (DEMO_DB_PATH if a.demo else DB_PATH)
-    run(db, a.csv, demo=a.demo, only=set(filter(None, a.only.split(","))) or None)
+    run(db, a.csv, demo=a.demo, only=set(filter(None, a.only.split(","))) or None, new_only=a.new_only)
 
 
 if __name__ == "__main__":

@@ -178,13 +178,14 @@ api/  erp_api/  valuation_api/  ...   导出的静态 JSON
 
 **日常使用**
 - 之后全自动，每天 19:30 更新；打开页面「技术指标分析」即可查看。
-- 在线改股票池：页面「股票池」→「设置令牌」（只需一次，页面里有逐步说明）→ 增删/导入 → 「保存并更新」。约 5 分钟后刷新页面看到新股票的数据。
+- 在线改股票池：页面「股票池」→「设置令牌」（只需一次，页面里有逐步说明）→ 增删/导入 → 「保存并更新」。通常 1–2 分钟后刷新页面即可看到新股票的数据（此类提交触发「快速模式」，只计算新增/恢复的股票；每日定时和手动运行仍全量重算，以应对前复权基准变化）。
 - 也可以直接编辑 `tech_config/stocks.csv`（列：`code,name,focus`；代码格式如 `600031.SH`、`00700.HK`；`name` 可留空，`focus` 为 1 表示重点关注），提交后同样会自动触发更新。
 
 **本地调试**
 ```bash
 pip install tushare pandas
 python3 tech_ingest.py --selftest                 # 离线自检
+python3 tech_ingest.py --new-only                # 快速模式：只算股票池里新增/恢复/尚无数据的股票
 python3 tech_ingest.py --demo                     # 用合成数据跑通全流程 → data/tech_demo.db（不联网）
 python3 tech_export.py --db data/tech_demo.db --out /tmp/tech_api_demo
 TUSHARE_TOKEN=xxx python3 tech_ingest.py --only 600031.SH,00700.HK   # 只处理指定代码
