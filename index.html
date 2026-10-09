@@ -119,7 +119,8 @@
   #techTbl th.on::after{content:attr(data-arrow);margin-left:3px;color:var(--navy)}
   #techTbl td small{color:var(--muted);font-size:11.5px;display:block}
   #techTbl .stale{font-size:11px;color:#8a5200;background:#fff6e0;border-radius:6px;padding:0 5px;margin-left:5px}
-  #techTbl .star{color:#e0a53b;margin-left:3px}
+  #techTbl .star,.tech-it .star{color:#e0a53b;margin-left:3px}
+  .tech-it.fc,#techTbl tbody tr.fc td{background:rgba(224,165,59,.10)}
   #techTbl tr.sw td{background:#fbfaf5}
   .tech-hint{font-size:11.5px;color:var(--muted);margin:2px 2px 8px}
 
@@ -923,25 +924,27 @@ function renderTechPane(){
 
 function techRenderPanels(){
   // 左：零轴附近金叉/死叉
-  const hits=techCrosses.filter(c=>c.ratio<techRatio).sort((a,b)=>a.ratio-b.ratio);
+  const fmap={}; techRows.forEach(r=>{ if(r.focus) fmap[r.code]=1; });
+  const fs=x=>fmap[x]?'<span class="star">★</span>':'';
+  const hits=techCrosses.filter(c=>c.ratio<techRatio).sort((a,b)=>(fmap[b.code]||0)-(fmap[a.code]||0)||a.ratio-b.ratio);
   let h='<h3>零轴附近金叉 / 死叉 <span class="cnt">'+hits.length+' 个信号</span></h3>';
   if(!hits.length) h+='<div class="empty" style="padding:24px 8px">'+esc(techDate)+' 没有零轴附近的金叉/死叉</div>';
   [["G","g","金叉"],["D","d","死叉"]].forEach(([k,cls,lb])=>{
     const g=hits.filter(c=>c.kind===k); if(!g.length) return;
     h+='<div class="tech-grp '+cls+'">'+lb+' · '+g.length+'</div>';
     g.forEach(c=>{
-      h+='<div class="tech-it"><span class="nm">'+esc(c.name)+'</span><span class="cd">'+esc(c.code)+'</span>'+
+      h+='<div class="tech-it'+(fmap[c.code]?' fc':'')+'"><span class="nm">'+esc(c.name)+fs(c.code)+'</span><span class="cd">'+esc(c.code)+'</span>'+
         '<span class="tg">'+(c.period==="W"?"周线":"日线")+'</span>'+
         '<span class="rt">收盘 '+fnum(c.close,2)+' · |DIFF|/价 '+(c.ratio*100).toFixed(2)+'%</span></div>';
     });
   });
   document.getElementById("techCross").innerHTML=h;
   // 右：状态机切换
-  const sw=techRows.filter(r=>r.prev).sort((a,b)=>TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||a.name.localeCompare(b.name,"zh"));
+  const sw=techRows.filter(r=>r.prev).sort((a,b)=>(b.focus?1:0)-(a.focus?1:0)||TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||a.name.localeCompare(b.name,"zh"));
   let h2='<h3>MACD 状态切换 <span class="cnt">'+sw.length+' 只</span></h3>';
   if(!sw.length) h2+='<div class="empty" style="padding:24px 8px">'+esc(techDate)+' 没有股票发生状态切换</div>';
   sw.forEach(r=>{
-    h2+='<div class="tech-it"><span class="nm">'+esc(r.name)+'</span><span class="cd">'+esc(r.code)+'</span>'+
+    h2+='<div class="tech-it'+(r.focus?' fc':'')+'"><span class="nm">'+esc(r.name)+fs(r.code)+'</span><span class="cd">'+esc(r.code)+'</span>'+
       stChip(r.prev)+'<span class="arrow">→</span>'+stChip(r.state)+
       '<span class="tg">'+esc(r.trig||"")+'</span><span class="rt">收盘 '+fnum(r.close,2)+'</span></div>';
   });
@@ -968,7 +971,7 @@ function techRenderTable(){
   const k=techSort.k, dir=techSort.dir;
   const val=r=>k==="state"?TECH_ORDER.indexOf(r.state):r[k];
   if(k==="default"){
-    rows.sort((a,b)=>(!!b.prev)-(!!a.prev)||TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||b.days-a.days);
+    rows.sort((a,b)=>(b.focus?1:0)-(a.focus?1:0)||(!!b.prev)-(!!a.prev)||TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||b.days-a.days);
   }else{
     rows.sort((a,b)=>{ const x=val(a), y=val(b);
       if(x==null||x==="") return 1; if(y==null||y==="") return -1;
@@ -977,7 +980,7 @@ function techRenderTable(){
   let h='<thead><tr>'+TECH_COLS.map(([key,lb])=>'<th data-k="'+key+'" class="'+(k===key?"on":"")+'" data-arrow="'+(dir>0?"▲":"▼")+'">'+lb+'</th>').join("")+'</tr></thead><tbody>';
   rows.forEach(r=>{
     const lc=r.lcx?('<span class="'+(r.lcx==="G"?"up":"down")+'">'+(r.lcx==="G"?"金叉":"死叉")+'</span> '+r.lcd.slice(5)):"—";
-    h+='<tr'+(r.prev?' class="sw"':'')+'><td>'+esc(r.name)+(r.focus?'<span class="star">★</span>':'')+
+    h+='<tr class="'+(r.prev?'sw ':'')+(r.focus?'fc':'')+'"><td>'+esc(r.name)+(r.focus?'<span class="star">★</span>':'')+
       (r.bar?'<span class="stale" title="该股当日没有新 K 线，显示的是 '+r.bar+' 的状态">'+r.bar.slice(5)+'</span>':'')+
       '<small>'+esc(r.code)+'</small></td>'+
       '<td>'+fnum(r.close,2)+'</td><td>'+pctHtml(r.pct)+'</td>'+
