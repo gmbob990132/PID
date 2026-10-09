@@ -1,0 +1,41 @@
+name: tech-daily
+on:
+  schedule:
+    - cron: '30 11 * * *'
+  push:
+    paths:
+      - 'tech_config/stocks.csv'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: tech-daily
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install tushare pandas
+      - run: python3 tech_ingest.py
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TUSHARE_MAX_CALLS_PER_MIN: '45'
+      - run: python3 tech_export.py
+      - name: 提交数据（无变化则跳过）
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add data/tech.db tech_api
+          if git diff --cached --quiet; then
+            echo "无变化"; exit 0
+          fi
+          git commit -m "tech update $(TZ=Asia/Shanghai date +%F)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && break
+            echo "第 $i 次推送失败，重试…"; sleep 5
+          done
