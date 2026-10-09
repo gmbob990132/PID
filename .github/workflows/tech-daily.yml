@@ -1,16 +1,16 @@
 name: tech-daily
 on:
   schedule:
-    - cron: '30 11 * * *'
+    - cron: '30 11 * * *'     # UTC 11:30 = 北京 19:30（A 股 15-16 点、港股 17-18 点入库后）
   push:
     paths:
-      - 'tech_config/stocks.csv'
+      - 'tech_config/stocks.csv'   # 页面"股票池"提交后自动重算
   workflow_dispatch: {}
 permissions:
   contents: write
 concurrency:
   group: tech-daily
-  cancel-in-progress: false
+  cancel-in-progress: false      # 排队而不是打断，避免同时写库/推送冲突
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -21,10 +21,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install tushare pandas
-      - run: python3 tech_ingest.py
+      - run: python3 tech_ingest.py $INGEST_ARGS    # 股票池提交触发 → 快速模式（只算新增/恢复的股票）；定时/手动 → 全量
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           TUSHARE_MAX_CALLS_PER_MIN: '45'
+          INGEST_ARGS: ${{ github.event_name == 'push' && '--new-only' || '' }}
       - run: python3 tech_export.py
       - name: 提交数据（无变化则跳过）
         run: |
