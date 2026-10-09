@@ -74,6 +74,54 @@
   }
   .agri-acc{grid-column:1/-1;background:var(--card);border:1px solid var(--navy);border-radius:16px;padding:10px 14px;margin-top:-4px}
   .agri-sub{font-size:12.5px;color:var(--sec);margin:4px 2px 6px}
+
+  /* ===== 技术指标分析 ===== */
+  .wrap.wide{max-width:1180px}
+  .tech-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:6px 0 4px}
+  .tech-bar .lab{font-size:13px;color:var(--sec)}
+  .tech-bar input[type=date],.tech-bar input[type=number],.tech-q{border:1px solid var(--border2);border-radius:10px;
+    padding:6px 10px;font-size:13px;font-family:inherit;color:var(--text);background:var(--card)}
+  .tech-bar input[type=number]{width:70px}
+  .tech-btn{border:1px solid var(--border2);background:var(--card);color:var(--sec);padding:6px 12px;font-size:13px;
+    border-radius:999px;cursor:pointer;white-space:nowrap}
+  .tech-btn:disabled{opacity:.4;cursor:default}
+  .tech-btn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+  .tech-hist{background:#fff6e0;border:1px solid #f0d9a0;color:#8a5200;border-radius:10px;padding:6px 12px;font-size:12.5px;margin:6px 0}
+  .tech-note{font-size:12px;color:var(--muted);margin:4px 2px}
+  .tech-warn{font-size:12.5px;color:#8a5200;margin:4px 2px}
+  .tech-panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+  @media (max-width:760px){.tech-panels{grid-template-columns:1fr}}
+  .tech-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 16px;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);min-height:120px;max-height:420px;overflow:auto}
+  .tech-panel h3{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .tech-panel h3 .cnt{font-size:12px;color:var(--muted);font-weight:400}
+  .tech-grp{font-size:12px;font-weight:700;margin:10px 0 4px}
+  .tech-grp.g{color:var(--up)} .tech-grp.d{color:var(--down)}
+  .tech-it{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .tech-it:last-child{border-bottom:none}
+  .tech-it .nm{font-weight:600}
+  .tech-it .cd{font-size:11.5px;color:var(--muted)}
+  .tech-it .rt{margin-left:auto;font-size:12px;color:var(--sec);white-space:nowrap}
+  .tech-it .tg{font-size:11px;border:1px solid var(--border2);border-radius:999px;padding:0 7px;color:var(--sec)}
+  .tech-it .arrow{color:var(--muted)}
+  .st{display:inline-block;padding:1px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .st-vs{background:#f4b8b4;color:#8f1d19} .st-s{background:#fbd5d2;color:#a3302b}
+  .st-ns{background:#fde8cc;color:#8a5200} .st-nw{background:#eeeccc;color:#6b6a2a}
+  .st-w{background:#d6ecd6;color:#2d6e2d}  .st-vw{background:#b9e0b9;color:#1f5a1f} .st-x{background:#eee;color:#666}
+  .tech-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+  .tech-chip{border:1px solid var(--border2);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;
+    cursor:pointer;color:var(--sec);white-space:nowrap}
+  .tech-chip.on{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);color:var(--text);font-weight:600}
+  .tech-chip .n{font-size:12px;color:var(--muted);margin-left:4px}
+  .tech-tools{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:4px 0 8px;font-size:13px;color:var(--sec)}
+  .tech-q{width:180px}
+  #techTbl th{cursor:pointer;user-select:none}
+  #techTbl th.on::after{content:attr(data-arrow);margin-left:3px;color:var(--navy)}
+  #techTbl td small{color:var(--muted);font-size:11.5px;display:block}
+  #techTbl .stale{font-size:11px;color:#8a5200;background:#fff6e0;border-radius:6px;padding:0 5px;margin-left:5px}
+  #techTbl .star{color:#e0a53b;margin-left:3px}
+  #techTbl tr.sw td{background:#fbfaf5}
+  .tech-hint{font-size:11.5px;color:var(--muted);margin:2px 2px 8px}
 </style>
 </head>
 <body>
@@ -152,6 +200,11 @@ function renderIndBar(){
   ag.className="ind-btn"+(curTop==="agri"?" on":"");
   ag.textContent="农产品"; ag.onclick=()=>selectAgri();
   bar.appendChild(ag);
+  const tc=document.createElement("button");    // 技术指标分析模块
+  tc.className="ind-btn"+(curTop==="tech"?" on":"");
+  tc.textContent="技术指标分析"; tc.onclick=()=>selectTech();
+  bar.appendChild(tc);
+  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech");
 }
 
 async function selectModule(id){
@@ -719,6 +772,207 @@ function agriRangeCutoff(k){
   const days={"6m":183,"1y":366,"3y":1096,"all":null}[k];
   if(!days) return null;
   const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().slice(0,10);
+}
+
+
+// ================== 技术指标分析（MACD：零轴金叉/死叉 + 6 态状态机） ==================
+const TECH_ST_CLS = {"极强":"vs","强":"s","中性偏强":"ns","中性偏弱":"nw","弱":"w","极弱":"vw"};
+const TECH_ORDER = ["极强","强","中性偏强","中性偏弱","弱","极弱"];   // 由强到弱，与配色一致
+let techSub="macd", techMeta=null, techStocks={}, techStockList=[], techDate=null, techRows=[], techCrosses=[];
+let techState="all", techQ="", techOnlySwitch=false, techRatio=0.005, techSort={k:"default",dir:1}, techErr="";
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function stChip(s){ return '<span class="st st-'+(TECH_ST_CLS[s]||"x")+'">'+esc(s)+'</span>'; }
+function fnum(v,dp){ return v==null||isNaN(v)?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function pctHtml(v){ if(v==null) return "—"; return '<span class="'+chgClass(v)+'">'+(v>0?"+":"")+v.toFixed(2)+'%</span>'; }
+
+async function selectTech(){
+  curTop="tech"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
+  renderIndBar(); renderTechSubBar();
+  document.getElementById("pane").innerHTML='<div class="empty">加载中…</div>';
+  await techBoot();
+  renderTechPane();
+}
+function renderTechSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  [["macd","MACD"],["pool","股票池"]].forEach(([k,lb])=>{
+    const b=document.createElement("button");
+    b.className="sub-btn"+(k===techSub?" on":""); b.textContent=lb;
+    b.onclick=()=>{ techSub=k; renderTechSubBar(); renderTechPane(); };
+    bar.appendChild(b);
+  });
+}
+async function techBoot(){
+  techErr="";
+  try{ techMeta=await loadCached("tech_api/macd/meta.json"); }
+  catch(e){ techMeta=null; techErr="技术指标数据还没有生成。请到仓库 Actions 页面手动运行一次 tech-daily。"; return; }
+  try{ const s=await loadCached("tech_api/stocks.json"); techStockList=s.stocks||[]; techStocks={}; techStockList.forEach(x=>techStocks[x.code]=x); }
+  catch(e){ techStockList=[]; techStocks={}; }
+  if(!techMeta.latest_date){ techErr="数据库里还没有行情数据。"; return; }
+  const ds=techDates();
+  if(!techDate || !ds.includes(techDate)) techDate=techMeta.latest_date;
+  try{ await techLoadDay(); }catch(e){ techErr="加载 "+techDate+" 的数据失败："+e.message; }
+}
+function techDates(){ return (techMeta&&techMeta.dates||[]).map(x=>x[0]); }
+async function techLoadDay(){
+  const d=techDate; let pack;
+  if(d===techMeta.latest_date){
+    const l=await loadCached("tech_api/macd/latest.json");
+    pack={fields:l.fields,rows:l.rows,crosses:l.crosses};
+  }else{
+    const ym=d.slice(0,7).replace("-","");
+    const sh=await loadCached("tech_api/macd/days/"+ym+".json");
+    const day=sh.days[d]||{rows:[],crosses:[]};
+    pack={fields:sh.fields,rows:day.rows,crosses:day.crosses};
+  }
+  techRows=pack.rows.map(r=>{
+    const o={}; pack.fields.forEach((f,i)=>o[f]=r[i]);
+    const st=techStocks[o.code]||{};
+    o.name=st.name||o.code; o.market=st.market||(o.code.endsWith(".HK")?"HK":"A"); o.focus=st.focus||0;
+    o.gap=(o.close>0&&o.diff!=null&&o.dea!=null)?Math.abs(o.diff-o.dea)/o.close*100:null;
+    return o;
+  });
+  techCrosses=(pack.crosses||[]).map(c=>{ const st=techStocks[c[0]]||{};
+    return {code:c[0],name:st.name||c[0],period:c[1],kind:c[2],close:c[3],diff:c[4],dea:c[5],ratio:c[6]}; });
+}
+async function techSetDate(d){
+  const ds=techDates(); if(!ds.length) return;
+  if(!ds.includes(d)){ const prev=ds.filter(x=>x<=d); d=prev.length?prev[prev.length-1]:ds[0]; }
+  techDate=d;
+  try{ await techLoadDay(); techErr=""; }catch(e){ techErr="加载 "+d+" 的数据失败："+e.message; }
+  renderTechPane();
+}
+function techStep(n){ const ds=techDates(); const i=ds.indexOf(techDate); techSetDate(ds[Math.min(Math.max(i+n,0),ds.length-1)]); }
+
+function renderTechPane(){
+  const pane=document.getElementById("pane");
+  if(techSub==="pool"){ renderTechPool(pane); return; }
+  if(techErr || !techMeta){ pane.innerHTML='<div class="empty">'+esc(techErr||"暂无数据")+'</div>'; return; }
+  const ds=techDates(), i=ds.indexOf(techDate), isLatest=(techDate===techMeta.latest_date);
+  const wd="日一二三四五六"[new Date(techDate+"T00:00:00").getDay()];
+  const st=techMeta.status;
+  const total=techRows.length, fresh=techRows.filter(r=>!r.bar).length;
+  let h='<div class="tech-bar"><span class="lab">数据日期</span>'+
+    '<button class="tech-btn" id="tPrev"'+(i<=0?" disabled":"")+'>← 前一日</button>'+
+    '<input type="date" id="tDate" value="'+techDate+'" min="'+ds[0]+'" max="'+techMeta.latest_date+'">'+
+    '<button class="tech-btn" id="tNext"'+(i>=ds.length-1?" disabled":"")+'>后一日 →</button>'+
+    (isLatest?'':'<button class="tech-btn on" id="tLatest">回到最新</button>')+
+    '<span class="lab">周'+wd+'</span>'+
+    '<span class="lab" style="margin-left:auto">零轴附近：|DIFF|/收盘价 &lt; <input type="number" id="tRatio" min="0.05" max="20" step="0.05" value="'+(techRatio*100)+'"> %</span></div>';
+  if(!isLatest) h+='<div class="tech-hist">正在查看历史：'+techDate+'（周'+wd+'）。最新数据日期是 '+techMeta.latest_date+'。</div>';
+  if(total && fresh<total*0.6) h+='<div class="tech-warn">当日只有 '+fresh+' / '+total+' 只股票有新 K 线（如 A 股休市而港股开市），其余股票沿用上一个交易日的状态，表中以黄色日期标出。</div>';
+  if(st && st.n_fail>0){
+    const names=Object.keys(st.failed||{}).slice(0,8).map(c=>((techStocks[c]||{}).name||c)).join("、");
+    h+='<div class="tech-warn">最近一次更新有 '+st.n_fail+' 只股票取数失败（'+esc(names)+(st.n_fail>8?" 等":"")+'），它们的数据可能不是最新。</div>';
+  }
+  h+='<div class="tech-panels"><div class="tech-panel" id="techCross"></div><div class="tech-panel" id="techSwitch"></div></div>';
+  h+='<div class="grp-title">全部股票 · 按当前状态筛选</div><div class="tech-chips" id="techChips"></div>'+
+    '<div class="tech-tools"><input class="tech-q" id="tQ" placeholder="搜索名称或代码" value="'+esc(techQ)+'">'+
+    '<label><input type="checkbox" id="tSw"'+(techOnlySwitch?" checked":"")+'> 仅看当日发生切换的</label><span id="techCnt"></span></div>'+
+    '<div class="tech-hint">「DIF-DEA 差距」= |DIFF−DEA| ÷ 收盘价，越小说明离金叉/死叉越近（也就是离状态切换越近）。点表头可排序。</div>'+
+    '<div class="tbl-wrap"><table id="techTbl"></table></div>';
+  if(st) h+='<div class="tech-note">数据更新于 '+esc((st.finished_at||"").replace("T"," ").slice(0,16))+'（北京时间）· 成功 '+st.n_ok+' / '+st.n_total+' 只</div>';
+  pane.innerHTML=h;
+
+  document.getElementById("tPrev").onclick=()=>techStep(-1);
+  document.getElementById("tNext").onclick=()=>techStep(1);
+  const tl=document.getElementById("tLatest"); if(tl) tl.onclick=()=>techSetDate(techMeta.latest_date);
+  document.getElementById("tDate").onchange=e=>{ if(e.target.value) techSetDate(e.target.value); };
+  document.getElementById("tRatio").oninput=e=>{ const v=parseFloat(e.target.value); if(v>0){ techRatio=v/100; techRenderPanels(); } };
+  document.getElementById("tQ").oninput=e=>{ techQ=e.target.value; techRenderTable(); };
+  document.getElementById("tSw").onchange=e=>{ techOnlySwitch=e.target.checked; techRenderTable(); };
+  techRenderPanels(); techRenderChips(); techRenderTable();
+}
+
+function techRenderPanels(){
+  // 左：零轴附近金叉/死叉
+  const hits=techCrosses.filter(c=>c.ratio<techRatio).sort((a,b)=>a.ratio-b.ratio);
+  let h='<h3>零轴附近金叉 / 死叉 <span class="cnt">'+hits.length+' 个信号</span></h3>';
+  if(!hits.length) h+='<div class="empty" style="padding:24px 8px">'+esc(techDate)+' 没有零轴附近的金叉/死叉</div>';
+  [["G","g","金叉"],["D","d","死叉"]].forEach(([k,cls,lb])=>{
+    const g=hits.filter(c=>c.kind===k); if(!g.length) return;
+    h+='<div class="tech-grp '+cls+'">'+lb+' · '+g.length+'</div>';
+    g.forEach(c=>{
+      h+='<div class="tech-it"><span class="nm">'+esc(c.name)+'</span><span class="cd">'+esc(c.code)+'</span>'+
+        '<span class="tg">'+(c.period==="W"?"周线":"日线")+'</span>'+
+        '<span class="rt">收盘 '+fnum(c.close,2)+' · |DIFF|/价 '+(c.ratio*100).toFixed(2)+'%</span></div>';
+    });
+  });
+  document.getElementById("techCross").innerHTML=h;
+  // 右：状态机切换
+  const sw=techRows.filter(r=>r.prev).sort((a,b)=>TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||a.name.localeCompare(b.name,"zh"));
+  let h2='<h3>MACD 状态切换 <span class="cnt">'+sw.length+' 只</span></h3>';
+  if(!sw.length) h2+='<div class="empty" style="padding:24px 8px">'+esc(techDate)+' 没有股票发生状态切换</div>';
+  sw.forEach(r=>{
+    h2+='<div class="tech-it"><span class="nm">'+esc(r.name)+'</span><span class="cd">'+esc(r.code)+'</span>'+
+      stChip(r.prev)+'<span class="arrow">→</span>'+stChip(r.state)+
+      '<span class="tg">'+esc(r.trig||"")+'</span><span class="rt">收盘 '+fnum(r.close,2)+'</span></div>';
+  });
+  document.getElementById("techSwitch").innerHTML=h2;
+}
+
+function techRenderChips(){
+  const cnt={}; techRows.forEach(r=>cnt[r.state]=(cnt[r.state]||0)+1);
+  let h='<span class="tech-chip'+(techState==="all"?" on":"")+'" data-s="all">全部<span class="n">'+techRows.length+'</span></span>';
+  TECH_ORDER.forEach(s=>{
+    h+='<span class="tech-chip'+(techState===s?" on":"")+'" data-s="'+s+'">'+stChip(s)+'<span class="n">'+(cnt[s]||0)+'</span></span>';
+  });
+  const el=document.getElementById("techChips"); el.innerHTML=h;
+  el.querySelectorAll(".tech-chip").forEach(c=>c.onclick=()=>{ techState=c.dataset.s; techRenderChips(); techRenderTable(); });
+}
+
+const TECH_COLS=[
+  ["name","名称 / 代码"],["close","收盘"],["pct","涨跌幅"],["state","当前状态"],["since","入此状态"],["days","已持续(日)"],
+  ["diff","DIFF"],["dea","DEA"],["hist","MACD柱"],["lcd","最近交叉"],["gap","DIF-DEA 差距"]];
+function techRenderTable(){
+  const q=techQ.trim().toLowerCase();
+  let rows=techRows.filter(r=>(techState==="all"||r.state===techState)&&(!techOnlySwitch||r.prev)&&
+    (!q||r.name.toLowerCase().includes(q)||r.code.toLowerCase().includes(q)));
+  const k=techSort.k, dir=techSort.dir;
+  const val=r=>k==="state"?TECH_ORDER.indexOf(r.state):r[k];
+  if(k==="default"){
+    rows.sort((a,b)=>(!!b.prev)-(!!a.prev)||TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||b.days-a.days);
+  }else{
+    rows.sort((a,b)=>{ const x=val(a), y=val(b);
+      if(x==null||x==="") return 1; if(y==null||y==="") return -1;
+      return (typeof x==="string"?x.localeCompare(y,"zh"):x-y)*dir; });
+  }
+  let h='<thead><tr>'+TECH_COLS.map(([key,lb])=>'<th data-k="'+key+'" class="'+(k===key?"on":"")+'" data-arrow="'+(dir>0?"▲":"▼")+'">'+lb+'</th>').join("")+'</tr></thead><tbody>';
+  rows.forEach(r=>{
+    const lc=r.lcx?('<span class="'+(r.lcx==="G"?"up":"down")+'">'+(r.lcx==="G"?"金叉":"死叉")+'</span> '+r.lcd.slice(5)):"—";
+    h+='<tr'+(r.prev?' class="sw"':'')+'><td>'+esc(r.name)+(r.focus?'<span class="star">★</span>':'')+
+      (r.bar?'<span class="stale" title="该股当日没有新 K 线，显示的是 '+r.bar+' 的状态">'+r.bar.slice(5)+'</span>':'')+
+      '<small>'+esc(r.code)+'</small></td>'+
+      '<td>'+fnum(r.close,2)+'</td><td>'+pctHtml(r.pct)+'</td>'+
+      '<td>'+stChip(r.state)+(r.prev?'<small>'+esc(r.prev)+' →</small>':'')+'</td>'+
+      '<td>'+(r.since||"").slice(5)+'</td><td>'+r.days+'</td>'+
+      '<td>'+fnum(r.diff,3)+'</td><td>'+fnum(r.dea,3)+'</td>'+
+      '<td class="'+chgClass(r.hist)+'">'+fnum(r.hist,3)+'</td><td>'+lc+'</td>'+
+      '<td>'+(r.gap==null?"—":r.gap.toFixed(2)+"%")+'</td></tr>';
+  });
+  if(!rows.length) h+='<tr><td colspan="'+TECH_COLS.length+'" class="empty">没有符合条件的股票</td></tr>';
+  h+='</tbody>';
+  const t=document.getElementById("techTbl"); t.innerHTML=h;
+  document.getElementById("techCnt").textContent="共 "+rows.length+" 只";
+  t.querySelectorAll("th").forEach(th=>th.onclick=()=>{
+    const key=th.dataset.k;
+    techSort = (techSort.k===key)?{k:key,dir:-techSort.dir}:{k:key,dir:(key==="name"||key==="gap"?1:-1)};
+    techRenderTable();
+  });
+}
+
+function renderTechPool(pane){
+  if(!techStockList.length){ pane.innerHTML='<div class="empty">'+esc(techErr||"股票池数据还没有生成")+'</div>'; return; }
+  const on=techStockList.filter(s=>s.enabled), off=techStockList.filter(s=>!s.enabled);
+  let h='<div class="tech-note">共 '+on.length+' 只启用'+(off.length?'，'+off.length+' 只已停用（历史数据保留）':'')+
+    '。在线增删与批量导入将在下一阶段加入；目前请直接编辑仓库里的 <code>tech_config/stocks.csv</code>。</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>名称 / 代码</th><th>市场</th><th>状态</th><th>加入日期</th></tr></thead><tbody>';
+  techStockList.forEach(s=>{
+    const stt=!s.enabled?'<span class="flat">已停用 '+esc(s.removed_at||"")+'</span>':(s.has_data?'<span class="down">正常</span>':'<span style="color:#8a5200">待计算</span>');
+    h+='<tr><td>'+esc(s.name||s.code)+(s.focus?'<span class="star" style="color:#e0a53b"> ★</span>':'')+'<small style="display:block;color:var(--muted);font-size:11.5px">'+esc(s.code)+'</small></td>'+
+      '<td>'+(s.market==="HK"?"港股":"A股")+'</td><td>'+stt+'</td><td>'+esc(s.added_at||"")+'</td></tr>';
+  });
+  pane.innerHTML=h+'</tbody></table></div>';
 }
 
 window.addEventListener("resize", ()=>{
