@@ -464,6 +464,11 @@ async function renderValPane(){
     html+='<div id="erphead" style="margin:6px 0 10px"></div>';
     html+='<div class="erp-chart-sub">点位（左轴）+ 股权溢价指数%（右轴）</div><div class="erp-chart" id="erpc1"></div>';
     html+='<div class="erp-chart-sub" id="erpsub2"></div><div class="erp-chart" id="erpc2"></div>';
+    html+='<div id="divSec" style="display:none">'+
+      '<div class="erp-chart-title" style="margin-top:22px">中美分化（沪深300 ÷ 标普500）</div>'+
+      '<div id="divhead" style="margin:6px 0 10px"></div>'+
+      '<div class="erp-chart-sub">沪深300（左轴）与标普500（右轴）点位</div><div class="erp-chart" id="divc1"></div>'+
+      '<div class="erp-chart-sub" id="divsub2"></div><div class="erp-chart" id="divc2"></div></div>';
   }
   pane.innerHTML=html;
 
@@ -488,7 +493,7 @@ async function renderValPane(){
   const q=(perc.metrics[valMetric]||{})[valYear+"y"];
   drawValQuant("valchart","valsub",label,fltRange(ws.points||[]),fltRange((ms&&ms.points)||[]),q,2,"近"+valYear+"年");
 
-  if(idx==="csi300") await drawCsi300Erp();
+  if(idx==="csi300"){ await drawCsi300Erp(); await drawCsi300Divergence(); }
 }
 
 // 估值图：两条线(加权+成分股中位数) + 加权的三条分位线
@@ -574,6 +579,46 @@ async function drawCsi300Erp(){
   });
   erpCharts.push(c1);
   drawErpQuant("erpc2","erpsub2","股权溢价指数","#d4537e",erpF.map(p=>p.date),erpF,(perc.erp||{})["5y"],2,"%","近5年");
+}
+
+// 中美分化 = 沪深300 ÷ 标普500：比值越高，A股相对美股越强；越低，越弱（中性色，不做红绿好坏判断）
+async function drawCsi300Divergence(){
+  let ratio, spx, close, perc;
+  try{
+    [ratio, spx, close, perc] = await Promise.all([
+      loadCached("erp_api/csi300/series/spx_ratio.full.json"),
+      loadCached("erp_api/csi300/series/spx_close.full.json"),
+      loadCached("erp_api/csi300/series/close.full.json"),
+      loadCached("erp_api/csi300/percentiles.json"),
+    ]);
+  }catch(e){ return; }                       // 数据文件还没生成（首次运行前）→ 整块不显示
+  const all=ratio.points||[]; if(!all.length) return;
+  document.getElementById("divSec").style.display="";
+  const cur=all[all.length-1], p5=_posWithin(all,cur.value,5), p10=_posWithin(all,cur.value,10);
+  const pl=(lab,pos)=>'<div class="flat" style="font-size:12.5px;margin-top:4px;font-weight:600">'+lab+' '+(pos==null?"—":Math.round(pos*100)+"%")+'</div>';
+  document.getElementById("divhead").innerHTML='<div class="grid"><div class="card"><div class="nm">中美分化</div>'+
+    '<div><span class="val">'+cur.value.toFixed(3)+'</span></div>'+pl("近5年百分位",p5)+pl("近10年百分位",p10)+
+    '<div style="font-size:11.5px;color:#999;margin-top:6px">'+esc(cur.date)+'　比值越高，A股相对美股越强</div></div></div>';
+  const rF=fltRange(all), cF=fltRange(close.points||[]), sF=fltRange(spx.points||[]);
+  // 图1：两个指数点位（按沪深300日期对齐，美股取 ≤ 当日最近收盘）
+  const dates=cF.map(p=>p.date), sp=sF; let j=-1;
+  const sval=dates.map(d=>{ while(j+1<sp.length && sp[j+1].date<=d) j++; return j>=0? sp[j].value : null; });
+  const c1=echarts.init(document.getElementById("divc1"));
+  c1.setOption({
+    grid:{left:8,right:10,top:30,bottom:24,containLabel:true},
+    legend:{top:0,data:["沪深300","标普500"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis"},
+    xAxis:{type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}},
+    yAxis:[{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+           {type:"value",scale:true,splitLine:{show:false},axisLabel:{color:"#888"}}],
+    series:[
+      {name:"沪深300",type:"line",yAxisIndex:0,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},data:cF.map(p=>p.value)},
+      {name:"标普500",type:"line",yAxisIndex:1,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#7a8a99"},data:sval,connectNulls:true},
+    ],
+  });
+  erpCharts.push(c1);
+  // 图2：比值 + 近5年分位线
+  drawErpQuant("divc2","divsub2","中美分化","#6b5bd6",rF.map(p=>p.date),rF,(perc.spx_ratio||{})["5y"],3,"","近5年");
 }
 
 function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit, yrLabel){

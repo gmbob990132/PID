@@ -6,8 +6,10 @@
 数据源：
   - 中证指数官网接口：各指数每日行情 + PE(TTM)（字段 peg 实为 PE_TTM），按 indexCode 区分
   - 中债网：10 年期国债收益率（共用）
+  - 标普500 收盘（akshare/新浪 → Yahoo → Stooq 依次兜底；取数失败不影响其他指标）
 衍生：
   - {指数}股权溢价指数 = 1/PE(TTM)*100 − 10Y   （单位：%）
+  - 沪深300 中美分化 = 沪深300 收盘 ÷ 标普500 收盘（美股取 ≤ 当日的最近一个收盘，覆盖两地节假日错位）
 
 用法：
   python3 erp_ingest.py            # 联网抓取/补齐，写入 data/erp.db
@@ -47,6 +49,10 @@ CSI_FIELDS = [
     ("tradingValue", "amount", "成交额",   "元", "raw"),
 ]
 BOND_METRIC = ("cn_10y_yield", "10年国债收益率", "%", "rate")
+SPX_METRIC = ("spx_close", "标普500点位", "点", "price")
+RATIO_METRIC = ("csi300_spx_ratio", "沪深300/标普500（中美分化）", "倍", "valuation")
+SPX_START = date(2015, 1, 1)
+RATIO_MAX_GAP_DAYS = 10     # 美股最近收盘距 A 股日期超过这么多天则不算（防止断档数据乱配）
 
 
 def all_metrics():
@@ -56,6 +62,8 @@ def all_metrics():
             ms.append({"id": f"{idx['id']}_{suf}", "name": f"{idx['name']}{tail}", "unit": u, "category": cat})
         ms.append({"id": f"{idx['id']}_erp", "name": f"{idx['name']}股权溢价指数", "unit": "%", "category": "valuation"})
     ms.append({"id": BOND_METRIC[0], "name": BOND_METRIC[1], "unit": BOND_METRIC[2], "category": BOND_METRIC[3]})
+    ms.append({"id": SPX_METRIC[0], "name": SPX_METRIC[1], "unit": SPX_METRIC[2], "category": SPX_METRIC[3]})
+    ms.append({"id": RATIO_METRIC[0], "name": RATIO_METRIC[1], "unit": RATIO_METRIC[2], "category": RATIO_METRIC[3]})
     return ms
 
 # ================= 适配器（source 层）=================
@@ -152,6 +160,61 @@ def bond_fetch_range(start_d, end_d):
         seg_start = date(seg_start.year + 1, 1, 1)
     return y
 
+def _spx_akshare(start_d, end_d):
+    import akshare as ak
+    df = ak.index_us_stock_sina(symbol=".INX")
+    out = {}
+    for _, r in df.iterrows():
+        d = _norm_date(r["date"])
+        v = _to_float(r["close"])
+        if v and start_d.isoformat() <= d <= end_d.isoformat():
+            out[d] = v
+    return out
+
+
+def _spx_yahoo(start_d, end_d):
+    p1 = int(datetime(start_d.year, start_d.month, start_d.day, tzinfo=timezone.utc).timestamp())
+    p2 = int(datetime(end_d.year, end_d.month, end_d.day, tzinfo=timezone.utc).timestamp()) + 86400 * 2
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1={p1}&period2={p2}&interval=1d"
+    req = Request(url, headers={"User-Agent": _CSI_HEADERS["User-Agent"]})
+    with urlopen(req, timeout=30) as r:
+        j = json.loads(r.read().decode("utf-8"))
+    res = j["chart"]["result"][0]
+    off = res["meta"].get("gmtoffset", 0)
+    out = {}
+    for t, c in zip(res["timestamp"], res["indicators"]["quote"][0]["close"]):
+        if c:
+            out[datetime.fromtimestamp(t + off, timezone.utc).strftime("%Y-%m-%d")] = float(c)
+    return out
+
+
+def _spx_stooq(start_d, end_d):
+    url = f"https://stooq.com/q/d/l/?s=%5Espx&i=d&d1={start_d:%Y%m%d}&d2={end_d:%Y%m%d}"
+    req = Request(url, headers={"User-Agent": _CSI_HEADERS["User-Agent"]})
+    with urlopen(req, timeout=30) as r:
+        txt = r.read().decode("utf-8", "ignore")
+    out = {}
+    for line in txt.splitlines()[1:]:
+        c = line.split(",")
+        if len(c) >= 5 and re.match(r"\d{4}-\d{2}-\d{2}$", c[0]) and _to_float(c[4]):
+            out[c[0]] = float(c[4])
+    return out
+
+
+def spx_fetch_range(start_d, end_d):
+    """依次尝试多个源，返回 (来源名, {日期: 收盘})。全部失败则抛出汇总错误。"""
+    errs = []
+    for name, fn in (("akshare-sina", _spx_akshare), ("yahoo", _spx_yahoo), ("stooq", _spx_stooq)):
+        try:
+            got = fn(start_d, end_d)
+            if got:
+                return name, got
+            errs.append(f"{name}: 空数据")
+        except Exception as ex:  # noqa: BLE001
+            errs.append(f"{name}: {str(ex)[:80]}")
+    raise RuntimeError("标普500 所有数据源都失败 → " + " | ".join(errs))
+
+
 # ================= 落库核心（store 层）=================
 def init_db(conn):
     conn.executescript("""
@@ -217,6 +280,26 @@ def compute_erp(conn, prefix, now_utc):
         n += upsert(conn, f"{prefix}_erp", obs_date, round(100.0 / pe - y10, 4), "derived", now_utc)
     return n
 
+def compute_ratio(conn, now_utc):
+    """沪深300 ÷ 标普500。美股取 ≤ A股日期 的最近一个收盘（两地节假日不同）。"""
+    spx = conn.execute("SELECT obs_date, value FROM observations WHERE metric_id=? ORDER BY obs_date",
+                       (SPX_METRIC[0],)).fetchall()
+    if not spx:
+        return 0
+    cs = conn.execute("SELECT obs_date, value FROM observations WHERE metric_id='csi300_close' ORDER BY obs_date").fetchall()
+    n, j, last = 0, -1, None
+    for d, c in cs:
+        while j + 1 < len(spx) and spx[j + 1][0] <= d:
+            j += 1
+        if j < 0:
+            continue
+        sd, sv = spx[j]
+        gap = (datetime.strptime(d, "%Y-%m-%d") - datetime.strptime(sd, "%Y-%m-%d")).days
+        if gap > RATIO_MAX_GAP_DAYS or not sv:
+            continue
+        n += upsert(conn, RATIO_METRIC[0], d, round(c / sv, 6), "derived", now_utc)
+    return n
+
 # ================= 主流程（run 层）=================
 def run(db_path):
     now_utc = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -265,6 +348,17 @@ def run(db_path):
                 print(f"!! [{idx['name']}] 中证取数失败：", ex)
             n_erp = compute_erp(conn, pfx, now_utc)
             log_run(conn, f"{pfx}_erp", "ok", n_erp, "computed", now_utc)
+        # ---- 标普500 + 中美分化（失败只告警，不影响上面的指标和退出码）----
+        spx_start = start_from(conn, SPX_METRIC[0], SPX_START, today)
+        try:
+            src, spx = ("selftest", _SAMPLE_SPX) if _SELFTEST else spx_fetch_range(spx_start, today)
+            ns = sum(upsert(conn, SPX_METRIC[0], d, v, src, now_utc) for d, v in spx.items())
+            log_run(conn, SPX_METRIC[0], "ok", ns, f"{src} from {spx_start}", now_utc)
+        except Exception as ex:
+            log_run(conn, SPX_METRIC[0], "failed", 0, str(ex)[:300], now_utc)
+            print("⚠ 标普500 取数失败（中美分化暂不更新，其余不受影响）：", ex)
+        n_ratio = compute_ratio(conn, now_utc)
+        log_run(conn, RATIO_METRIC[0], "ok", n_ratio, "computed", now_utc)
         conn.commit()
 
         # ---- 反馈 ----
@@ -287,6 +381,10 @@ def run(db_path):
                     print(f"     {lab:<10} 最新 {row[0]} = {v}   （共 {tot} 天）")
                 else:
                     print(f"     {lab:<10} 无数据")
+        for mid, lab in ((SPX_METRIC[0], "标普500"), (RATIO_METRIC[0], "中美分化")):
+            row = conn.execute("SELECT obs_date,value FROM observations WHERE metric_id=? ORDER BY obs_date DESC LIMIT 1", (mid,)).fetchone()
+            tot = conn.execute("SELECT COUNT(*) FROM observations WHERE metric_id=?", (mid,)).fetchone()[0]
+            print(f"  {lab:<10} " + (f"最新 {row[0]} = {row[1]:.4f}   （共 {tot} 天）" if row else "无数据"))
         return 0 if all_ok else 2
     finally:
         conn.close()
@@ -305,6 +403,7 @@ _SAMPLE_CSI = {
     ],
 }
 _SAMPLE_BOND = {"2026-09-11": 1.6899}
+_SAMPLE_SPX = {"2026-09-10": 6500.0, "2026-09-11": 6550.0}
 
 
 def main():

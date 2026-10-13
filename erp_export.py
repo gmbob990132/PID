@@ -123,6 +123,19 @@ def export(db_path, out_dir):
             "erp": _percentiles_for(conn, f"{pfx}_erp", today),
         })
 
+        # 沪深300 专属：中美分化（沪深300÷标普500）及标普500 点位，附近5/10年分位
+        if pfx == "csi300":
+            for mid, fn in (("csi300_spx_ratio", "spx_ratio"), ("spx_close", "spx_close")):
+                pts = _series(conn, mid)
+                _write(os.path.join(base, "series", f"{fn}.full.json"),
+                       {"schema_version": SCHEMA_VERSION, "generated_at": gen, "metric": mid,
+                        "range": "full", "points": pts})
+            pj = os.path.join(base, "percentiles.json")
+            with open(pj, encoding="utf-8") as f:
+                pdata = json.load(f)
+            pdata["spx_ratio"] = _percentiles_for(conn, "csi300_spx_ratio", today)
+            _write(pj, pdata)
+
         # 最新值（给指数清单顺带带上）
         lat = {}
         for suf in ("close", "pe_ttm", "erp"):
