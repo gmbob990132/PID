@@ -983,6 +983,20 @@ function techRenderPanels(){
         '<span class="rt">收盘 '+fnum(c.close,2)+' · |DIFF|/价 '+(c.ratio*100).toFixed(2)+'%</span></div>';
     });
   });
+  // 下方：其余金叉/死叉（不限零轴附近；已在上面的不重复）
+  const rest=techCrosses.filter(c=>!(c.ratio<techRatio)).sort((a,b)=>(fmap[b.code]||0)-(fmap[a.code]||0)||a.ratio-b.ratio);
+  h+='<h3 style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">其他金叉 / 死叉 <span class="cnt">'+rest.length+' 个信号 · 不在零轴附近</span></h3>';
+  if(!rest.length) h+='<div class="empty" style="padding:18px 8px">'+esc(techDate)+' 没有其他金叉/死叉</div>';
+  [["G","g","金叉"],["D","d","死叉"]].forEach(([k,cls,lb])=>{
+    const g=rest.filter(c=>c.kind===k); if(!g.length) return;
+    h+='<div class="tech-grp '+cls+'">'+lb+' · '+g.length+'</div>';
+    g.forEach(c=>{
+      h+='<div class="tech-it'+(fmap[c.code]?' fc':'')+'"><span class="nm">'+esc(c.name)+fs(c.code)+'</span><span class="cd">'+esc(c.code)+'</span>'+
+        '<span class="tg">'+(c.period==="W"?"周线":"日线")+'</span>'+
+        '<span class="tg">'+(c.diff>=0?"零轴上方":"零轴下方")+'</span>'+
+        '<span class="rt">收盘 '+fnum(c.close,2)+' · |DIFF|/价 '+(c.ratio*100).toFixed(2)+'%</span></div>';
+    });
+  });
   document.getElementById("techCross").innerHTML=h;
   // 右：状态机切换
   const sw=techRows.filter(r=>r.prev).sort((a,b)=>(b.focus?1:0)-(a.focus?1:0)||TECH_ORDER.indexOf(a.state)-TECH_ORDER.indexOf(b.state)||a.name.localeCompare(b.name,"zh"));
