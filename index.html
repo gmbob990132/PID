@@ -901,7 +901,7 @@ async function selectEtf(){
 }
 function renderEtfSubBar(){
   const bar=document.getElementById("subBar"); bar.innerHTML="";
-  [["hs300","沪深300 ETF"],["csi500","中证500 ETF"],["margin","融资融券"]].forEach(([k,lb])=>{
+  [["hs300","沪深300 ETF"],["sse50","上证50 ETF"],["csi500","中证500 ETF"],["margin","融资融券"]].forEach(([k,lb])=>{
     const b=document.createElement("button");
     b.className="sub-btn"+(k===etfSub?" on":""); b.textContent=lb;
     b.onclick=()=>{ etfSub=k; etfSel=null; renderEtfSubBar(); renderEtfPane(); };

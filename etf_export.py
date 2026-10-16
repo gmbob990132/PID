@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-GROUP_NAMES = {"hs300": "沪深300 ETF", "csi500": "中证500 ETF"}
+GROUP_NAMES = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF"}
 MARGIN_FIELDS = ["rzye", "rzmre", "rzche", "rqye", "rzrqye"]      # 融资余额/融资买入额/融资偿还额/融券余额/两融余额
 
 
