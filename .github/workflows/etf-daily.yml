@@ -1,0 +1,38 @@
+name: etf-daily
+on:
+  schedule:
+    - cron: '30 12 * * *'     # UTC 12:30 = 北京 20:30（沪市 ETF 份额、融资融券当日数据已发布）
+    - cron: '40 1 * * *'      # UTC 01:40 = 北京 09:40（深市 ETF 份额次晨补齐）
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: etf-daily
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install tushare pandas
+      - run: python3 etf_ingest.py
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TUSHARE_MAX_CALLS_PER_MIN: '45'
+      - run: python3 etf_export.py
+      - name: 提交数据（同步远端 + 重试，容忍并发与偶发错误）
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add data/etf.db etf_api etf_config
+          if git diff --cached --quiet; then echo "无变化"; exit 0; fi
+          git commit -m "etf update $(TZ=Asia/Shanghai date +%F)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin main && { echo "推送成功"; exit 0; }
+            echo "推送失败，第 $i 次重试…"; sleep 10
+          done
+          echo "多次重试仍失败"; exit 1
