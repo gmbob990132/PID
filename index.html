@@ -157,6 +157,15 @@
   .pool-card textarea{width:100%;height:150px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
   .pool-prev{max-height:280px;overflow:auto;margin-top:10px;border:1px solid var(--border);border-radius:10px}
   .pool-prev table{min-width:0}
+  .etf-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:14px;padding:12px 16px}
+  .etf-head .t{font-size:17px;font-weight:700}
+  .etf-head .chip{font-size:12px;background:rgba(255,255,255,.18);border-radius:999px;padding:2px 10px}
+  .etf-head .upd{margin-left:auto;font-size:12px;opacity:.8}
+  .etf-cards .etf-card{cursor:pointer;padding:12px 14px}
+  .etf-cards .etf-card.tot{cursor:default;background:#f3f6fb}
+  .etf-cards .etf-card .val{font-size:22px}
+  .etf-cards .etf-card.sel{outline:2px solid var(--accent);background:#f3f8ff}
+  #mxBar,#etfRanges{display:flex;gap:6px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -239,7 +248,11 @@ function renderIndBar(){
   tc.className="ind-btn"+(curTop==="tech"?" on":"");
   tc.textContent="技术指标分析"; tc.onclick=()=>selectTech();
   bar.appendChild(tc);
-  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech");
+  const ef=document.createElement("button");    // ETF·两融模块
+  ef.className="ind-btn"+(curTop==="etf"?" on":"");
+  ef.textContent="ETF·两融"; ef.onclick=()=>selectEtf();
+  bar.appendChild(ef);
+  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf");
 }
 
 async function selectModule(id){
@@ -865,6 +878,150 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;"
 function stChip(s){ return '<span class="st st-'+(TECH_ST_CLS[s]||"x")+'">'+esc(s)+'</span>'; }
 function fnum(v,dp){ return v==null||isNaN(v)?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
 function pctHtml(v){ if(v==null) return "—"; return '<span class="'+chgClass(v)+'">'+(v>0?"+":"")+v.toFixed(2)+'%</span>'; }
+
+// ================== ETF·两融模块（ETF 总份额变化 + 融资融券；数据：Tushare 每日更新）==================
+const ETF_RANGES=[["1m","近1月"],["3m","近3月"],["6m","近6月"],["1y","近1年"],["all","全部(3年)"]];
+const ETF_COLORS=["#d4533a","#2a8bd4","#e0a53b","#3aa86b","#8a5cc8","#7a8a99"];
+let etfSub="hs300", etfRange="1y", etfSel=null, etfData=null, marginData=null, etfMeta=null, etfErr="", marginEx="all";
+
+async function selectEtf(){
+  curTop="etf"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
+  renderIndBar(); renderEtfSubBar();
+  document.getElementById("pane").innerHTML='<div class="empty">加载中…</div>';
+  etfErr="";
+  try{
+    [etfData, marginData] = await Promise.all([loadCached("etf_api/etf.json"), loadCached("etf_api/margin.json")]);
+    etfMeta = await loadCached("etf_api/meta.json").catch(()=>null);
+  }catch(e){ etfData=null; marginData=null; etfErr="ETF/两融数据还没有生成。请到仓库 Actions 页面手动运行一次 etf-daily。"; }
+  renderEtfPane();
+}
+function renderEtfSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  [["hs300","沪深300 ETF"],["csi500","中证500 ETF"],["margin","融资融券"]].forEach(([k,lb])=>{
+    const b=document.createElement("button");
+    b.className="sub-btn"+(k===etfSub?" on":""); b.textContent=lb;
+    b.onclick=()=>{ etfSub=k; etfSel=null; renderEtfSubBar(); renderEtfPane(); };
+    bar.appendChild(b);
+  });
+}
+function etfCutoff(dates){            // 按"数据里最新日期"往回推，而不是按今天
+  if(!dates.length) return "0000-01-01";
+  if(etfRange==="all") return "0000-01-01";
+  const m={"1m":1,"3m":3,"6m":6,"1y":12}[etfRange]||12;
+  const d=new Date(dates[dates.length-1]+"T00:00:00"); d.setMonth(d.getMonth()-m);
+  return d.toISOString().slice(0,10);
+}
+function etfFmt(v,dp){ return v==null?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function etfBigYi(v){ if(v==null) return "—"; return Math.abs(v)>=10000? (v/10000).toFixed(3)+" 万亿": etfFmt(v,1)+" 亿"; }
+function etfRangeBar(){
+  return '<div class="ranges" id="etfRanges" style="margin:10px 0 4px">'+ETF_RANGES.map(([k,l])=>'<span class="rg'+(k===etfRange?" on":"")+'" data-r="'+k+'">'+l+'</span>').join("")+'</div>';
+}
+function etfBindRange(){ document.querySelectorAll("#etfRanges .rg").forEach(el=>el.onclick=()=>{ etfRange=el.dataset.r; renderEtfPane(); }); }
+function etfDelta(first,last,dp,unit){   // 返回 "+7.95亿 (+3.22%)" 的 HTML
+  if(first==null||last==null) return '<span class="flat">—</span>';
+  const d=last-first, p=first? d/first*100 : null, cls=d>0?"up":(d<0?"down":"flat");
+  return '<span class="'+cls+'">'+(d>0?"+":"")+etfFmt(d,dp)+unit+(p==null?"":' ('+(p>0?"+":"")+p.toFixed(2)+'%)')+'</span>';
+}
+function etfDispose(){ erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[]; }
+function etfAxisX(dates){ return {type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}}; }
+
+function renderEtfPane(){
+  const pane=document.getElementById("pane"); etfDispose();
+  if(etfErr||!etfData||!marginData){ pane.innerHTML='<div class="empty">'+esc(etfErr||"暂无数据")+'</div>'; return; }
+  if(etfSub==="margin") renderMarginPane(pane); else renderEtfGroup(pane, etfSub);
+}
+
+function renderEtfGroup(pane, gk){
+  const g=etfData.groups[gk]; if(!g||!g.dates.length){ pane.innerHTML='<div class="empty">这一组还没有数据</div>'; return; }
+  const cut=etfCutoff(g.dates), ix=[]; g.dates.forEach((d,i)=>{ if(d>=cut) ix.push(i); });
+  const dates=ix.map(i=>g.dates[i]);
+  const series=g.funds.map(f=>({f, v:ix.map(i=>g.shares[f.code][i])}));
+  const firstNN=a=>{ for(const x of a) if(x!=null) return x; return null; };
+  const lastNN=a=>{ for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return null; };
+  // 合计：只用"所有基金都有值"的日期（沪深披露日可能相差一天，避免合计被半天数据拉歪）
+  const full=[]; ix.forEach((gi,k)=>{ if(g.funds.every(f=>g.shares[f.code][gi]!=null)) full.push(k); });
+  const tdates=full.map(k=>dates[k]), tvals=full.map(k=>series.reduce((s,x)=>s+x.v[k],0));
+  const dchg=tvals.map((v,i)=>i? +(v-tvals[i-1]).toFixed(4) : null);
+
+  let h='<div class="etf-head"><span class="t">'+esc(g.name)+'</span><span class="chip">'+g.funds.length+' 只 · '+dates.length+' 个交易日</span>'+
+    (etfMeta&&etfMeta.etf_latest?'<span class="upd">数据至 '+esc(etfMeta.etf_latest)+'（单位：亿份）</span>':'')+'</div>'+etfRangeBar();
+  h+='<div class="grid etf-cards" style="margin-top:10px">';
+  h+='<div class="card etf-card tot"><div class="nm">合计 · '+g.funds.length+' 只</div><div class="val">'+etfFmt(lastNN(tvals),2)+' <span class="u">亿份</span></div>'+
+     '<div class="chg">'+etfDelta(firstNN(tvals),lastNN(tvals),2,"亿")+'</div></div>';
+  series.forEach((x,i)=>{
+    const sel=(etfSel===x.f.code);
+    h+='<div class="card etf-card'+(sel?' sel':'')+'" data-c="'+esc(x.f.code)+'" style="border-left:4px solid '+ETF_COLORS[i%ETF_COLORS.length]+'">'+
+      '<div class="nm">'+esc(x.f.name)+' · '+esc(x.f.code.slice(0,6))+'</div>'+
+      '<div class="val">'+etfFmt(lastNN(x.v),2)+' <span class="u">亿份</span></div>'+
+      '<div class="chg">'+etfDelta(firstNN(x.v),lastNN(x.v),2,"亿")+'</div></div>';
+  });
+  h+='</div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">总份额变化曲线</div><div class="erp-chart-sub">份额增加（涨）<span class="up">●</span>　份额减少（跌）<span class="down">●</span>　点击上方卡片可高亮某只</div><div class="erp-chart" id="etfc1"></div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">合计 · 每日份额净增减</div><div class="erp-chart-sub">柱：当日合计份额较前一日的变化（亿份）；份额增加 = 净申购（红），减少 = 净赎回（绿）</div><div class="erp-chart" id="etfc2"></div>';
+  pane.innerHTML=h; etfBindRange();
+  pane.querySelectorAll(".etf-card[data-c]").forEach(el=>el.onclick=()=>{ etfSel=(etfSel===el.dataset.c)?null:el.dataset.c; renderEtfPane(); });
+
+  const c1=echarts.init(document.getElementById("etfc1"));
+  c1.setOption({
+    grid:{left:8,right:12,top:36,bottom:24,containLabel:true},
+    legend:{top:0,type:"scroll",icon:"roundRect",itemWidth:14,itemHeight:3,data:series.map(x=>x.f.name)},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(2)+" 亿份"},
+    xAxis:etfAxisX(dates),
+    yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:series.map((x,i)=>({name:x.f.name,type:"line",showSymbol:false,connectNulls:true,data:x.v,
+      lineStyle:{width:(etfSel===x.f.code?3.2:2),opacity:(etfSel&&etfSel!==x.f.code?0.18:1)},
+      itemStyle:{color:ETF_COLORS[i%ETF_COLORS.length]}})),
+  });
+  erpCharts.push(c1);
+  const c2=echarts.init(document.getElementById("etfc2"));
+  c2.setOption({
+    grid:{left:8,right:12,top:16,bottom:24,containLabel:true},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":(v>0?"+":"")+Number(v).toFixed(2)+" 亿份"},
+    xAxis:{...etfAxisX(tdates),boundaryGap:true},
+    yAxis:{type:"value",splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:[{name:"合计日净增减",type:"bar",data:dchg.map(v=>v==null?null:{value:v,itemStyle:{color:v>=0?"#d43f3a":"#3a9d3a"}})}],
+  });
+  erpCharts.push(c2);
+}
+
+function renderMarginPane(pane){
+  const M=marginData, S=M.series[marginEx]; if(!M.dates.length){ pane.innerHTML='<div class="empty">还没有融资融券数据</div>'; return; }
+  const cut=etfCutoff(M.dates), ix=[]; M.dates.forEach((d,i)=>{ if(d>=cut) ix.push(i); });
+  const dates=ix.map(i=>M.dates[i]), pick=a=>ix.map(i=>a[i]);
+  const rz=pick(S.rzye), rq=pick(S.rqye), tot=pick(S.rzrqye), buy=pick(S.rzmre), rep=pick(S.rzche);
+  const net=buy.map((v,i)=>(v==null||rep[i]==null)?null:+(v-rep[i]).toFixed(2));
+  const firstNN=a=>{ for(const x of a) if(x!=null) return x; return null; };
+  const lastNN=a=>{ for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return null; };
+  const exBtn=[["all","全市场"],["SSE","沪市"],["SZSE","深市"]].map(([k,l])=>'<span class="rg'+(k===marginEx?" on":"")+'" data-x="'+k+'">'+l+'</span>').join("");
+  let h='<div class="etf-head"><span class="t">融资融券</span><span class="chip">'+dates.length+' 个交易日</span>'+
+    (etfMeta&&etfMeta.margin_latest?'<span class="upd">数据至 '+esc(etfMeta.margin_latest)+'（单位：亿元）</span>':'')+'</div>'+
+    '<div class="ranges" id="mxBar" style="margin:10px 0 0">'+exBtn+'</div>'+etfRangeBar();
+  const card=(nm,arr,isFlow)=>'<div class="card etf-card"><div class="nm">'+nm+'</div><div class="val">'+etfBigYi(lastNN(arr))+'</div>'+
+    '<div class="chg">'+(isFlow?'<span class="flat">'+esc(dates[dates.length-1]||"")+' 当日</span>':etfDelta(firstNN(arr),lastNN(arr),1,"亿"))+'</div></div>';
+  h+='<div class="grid etf-cards" style="margin-top:10px">'+card("两融余额",tot)+card("融资余额",rz)+card("融券余额",rq)+card("融资买入额",buy,true)+'</div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">两融余额 / 融资余额</div><div class="erp-chart-sub">单位：万亿元</div><div class="erp-chart" id="mxc1"></div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">融资买入额 与 融资净买入</div><div class="erp-chart-sub">线：每日融资买入额；柱：融资净买入（买入 − 偿还），正为红、负为绿（亿元）</div><div class="erp-chart" id="mxc2"></div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">融券余额</div><div class="erp-chart-sub">单位：亿元</div><div class="erp-chart" id="mxc3"></div>';
+  pane.innerHTML=h; etfBindRange();
+  document.querySelectorAll("#mxBar .rg").forEach(el=>el.onclick=()=>{ marginEx=el.dataset.x; renderEtfPane(); });
+  const mk=(id,opt)=>{ const c=echarts.init(document.getElementById(id)); c.setOption(opt); erpCharts.push(c); };
+  const base={grid:{left:8,right:12,top:30,bottom:24,containLabel:true},tooltip:{trigger:"axis"},xAxis:etfAxisX(dates)};
+  const wan=a=>a.map(v=>v==null?null:+(v/1e4).toFixed(4));
+  mk("mxc1",{...base,legend:{top:0,data:["两融余额","融资余额"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(3)+" 万亿"},
+    yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:[{name:"两融余额",type:"line",showSymbol:false,connectNulls:true,data:wan(tot),lineStyle:{width:2},itemStyle:{color:"#2a6fdb"}},
+            {name:"融资余额",type:"line",showSymbol:false,connectNulls:true,data:wan(rz),lineStyle:{width:2},itemStyle:{color:"#d4533a"}}]});
+  mk("mxc2",{...base,legend:{top:0,data:["融资买入额","融资净买入"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(1)+" 亿"},
+    yAxis:{type:"value",splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:[{name:"融资净买入",type:"bar",data:net.map(v=>v==null?null:{value:v,itemStyle:{color:v>=0?"#d43f3a":"#3a9d3a"}})},
+            {name:"融资买入额",type:"line",showSymbol:false,connectNulls:true,data:buy,lineStyle:{width:1.6},itemStyle:{color:"#7a8a99"}}]});
+  mk("mxc3",{...base,
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(1)+" 亿"},
+    yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+    series:[{name:"融券余额",type:"line",showSymbol:false,connectNulls:true,data:rq,lineStyle:{width:2},itemStyle:{color:"#8a5cc8"}}]});
+}
 
 async function selectTech(){
   curTop="tech"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
