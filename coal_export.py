@@ -31,7 +31,8 @@ def _minus_year(d):
 def _freq(dates):
     if len(dates) < 2:
         return "—", 7
-    gaps = [(_d(b) - _d(a)).days for a, b in zip(dates, dates[1:])]
+    recent = dates[-13:]                       # 只看最近 12 个间隔：老数据可能更密（日度），不能拖累现在的判断
+    gaps = [(_d(b) - _d(a)).days for a, b in zip(recent, recent[1:])]
     g = statistics.median(gaps)
     return ("周度" if g <= 10 else "月度" if g <= 40 else "低频"), g
 
@@ -81,9 +82,10 @@ def export(db_path, out_dir):
     runs = conn.execute("SELECT run_at,item,status,message FROM run_log ORDER BY id DESC LIMIT 40").fetchall()
     last_run = runs[0][0] if runs else None
     failed = [{"item": i, "message": m} for (t, i, s, m) in runs if s == "failed" and t == last_run]
+    earliest = min((s["points"][0][0] for g in groups for b in g["blocks"] for s in b["series"]), default=None)
     latest_all = max((s["latest"]["date"] for g in groups for b in g["blocks"] for s in b["series"]), default=None)
     out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "source": "CCTD 中国煤炭市场网",
-           "since": "2025-01-01", "latest": latest_all, "last_run": last_run, "failed": failed, "groups": groups}
+           "since": earliest, "latest": latest_all, "last_run": last_run, "failed": failed, "groups": groups}
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "coal.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
@@ -105,6 +107,9 @@ def _selftest():
     mo = [("2025-11-01", 641), ("2025-12-01", 619)] + [(f"2026-{m:02d}-01", 600 + m) for m in range(1, 10)]
     l, m, y, f = stats(mo, None)
     assert y is None and f == "月度"
+    old_daily = [(f"2024-{m:02d}-{d:02d}", 700) for m in (1, 2) for d in range(1, 29)] + wk
+    l, m, y, f = stats(old_daily, None)
+    assert f == "周度" and y and y["ref_date"] == "2025-10-17", (f, y)         # 前面一大段日度数据，不影响现在按周度判断
     l, m, y, f = stats([("2025-11-01", 641)], None)
     assert m is None
     l, m, y, f = stats([("2025-11-01", 641)], 10)

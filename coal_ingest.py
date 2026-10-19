@@ -7,8 +7,9 @@
   1. 秦皇岛动力煤价格（周度）：综合交易价 / 年度长协价 / 现货交易价，各含 5500/5000/4500 大卡
   2. 产地动力煤价格指数（月度）：山西 / 陕西 / 蒙西 / 蒙东（2025-11 起才有数据）
   3. 延安（黄陵）气煤：气精煤价格（周度）
-每次运行都从 SINCE(2025-01-01) 起整段重取（每个来源不到一百行），按 (series, date) 覆盖写入：
-首次 = 回填；之后每天跑 = 检查有没有新数据，同时自动吸收 CCTD 的事后修订。
+采集方式：库里没有数据 → 先一次取完接口里的全部历史（FULL_HISTORY，不设起点）；库里已有 → 只取"库内最新日期往前 OVERLAP_DAYS 天"
+之后的数据（重叠一小段，用来吸收 CCTD 对近期数字的事后修订），按 (series, date) 覆盖写入，历史数据不再重复请求。
+库文件被误删/丢失时，下次运行会自动整段回填。接口里到底有多少历史，以首次运行日志里的"新增 N 行"为准。
 
 落库：data/coal.db   表：coal_series / coal_price / run_log
 用法：
@@ -27,7 +28,8 @@ from datetime import datetime, timedelta, timezone
 CN_TZ = timezone(timedelta(hours=8))
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(HERE, "data", "coal.db")
-SINCE = "2025-01-01"
+FULL_HISTORY = "-0002-11-30"          # 站点自己"不限起点"的写法（浏览器默认请求就是这个）→ 取全部历史
+OVERLAP_DAYS = 60                # 增量时往回多取 60 天，吸收近期修订
 ENDPOINT = "https://www.cctd.com.cn/datasql.php"
 PAGE_LEN = 1000
 NCOL = 10                       # 页面里的表有 10 列（后几列是空的），与浏览器请求保持一致
@@ -81,7 +83,7 @@ def http_fetch(url, tries=3):
     raise RuntimeError(f"请求失败：{type(last).__name__} {str(last)[:120]}")
 
 
-def fetch_rows(block, since=SINCE, fetch=http_fetch, page_len=PAGE_LEN):
+def fetch_rows(block, since=FULL_HISTORY, fetch=http_fetch, page_len=PAGE_LEN):
     """取回 since 起的全部原始行（自动翻页）。"""
     rows, start = [], 0
     for _ in range(50):
@@ -89,7 +91,7 @@ def fetch_rows(block, since=SINCE, fetch=http_fetch, page_len=PAGE_LEN):
         data = j.get("data") or []
         rows.extend(data)
         total = int(j.get("recordsTotal") or 0)
-        start += page_len
+        start += len(data)                                   # 按实际返回的行数推进，站点若限制了单页行数也不会漏
         if not data or start >= total:
             break
     return rows
@@ -114,7 +116,7 @@ def parse_rows(block, rows):
     out = {}
     for r in rows:
         d = _norm_date(r[0]) if r else None
-        if not d or d < SINCE:
+        if not d:
             continue
         cells = [str(c).strip() for c in r[1:]]
         while cells and cells[-1] == "":
@@ -139,6 +141,14 @@ def init_db(conn):
     """)
 
 
+def incremental_since(conn, block_id):
+    """该来源已入库的最新日期往前 OVERLAP_DAYS 天；库里没有则取全部历史。"""
+    last = conn.execute("SELECT MAX(date) FROM coal_price WHERE series LIKE ? ESCAPE '\\'", (block_id.replace("_", "\\_") + "\\_%",)).fetchone()[0]
+    if not last:
+        return FULL_HISTORY
+    return (datetime.strptime(last, "%Y-%m-%d") - timedelta(days=OVERLAP_DAYS)).strftime("%Y-%m-%d")
+
+
 def run(db_path, fetch=http_fetch, page_len=PAGE_LEN):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
@@ -147,7 +157,8 @@ def run(db_path, fetch=http_fetch, page_len=PAGE_LEN):
     ok = 0
     for sort, b in enumerate(BLOCKS):
         try:
-            parsed = parse_rows(b, fetch_rows(b, SINCE, fetch, page_len))
+            since = incremental_since(conn, b["id"])
+            parsed = parse_rows(b, fetch_rows(b, since, fetch, page_len))
             if not parsed:
                 raise RuntimeError("接口返回空数据（站点改版或暂时不可用）")
             n_new = 0
@@ -162,7 +173,7 @@ def run(db_path, fetch=http_fetch, page_len=PAGE_LEN):
             latest = max(p[0] for pts in parsed.values() for p in pts)
             conn.execute("INSERT INTO run_log(run_at,item,status,message) VALUES (?,?,?,?)",
                          (now, b["id"], "ok", f"{len(parsed)} 条序列，新增 {n_new} 行，最新 {latest}"))
-            print(f"✔ {b['grp']}/{b['title']}：{len(parsed)} 条序列，新增 {n_new} 行，最新 {latest}")
+            print(f"✔ {b['grp']}/{b['title']}：自 {since} 起取数，{len(parsed)} 条序列，新增 {n_new} 行，最新 {latest}")
             ok += 1
         except Exception as e:  # noqa: BLE001
             conn.execute("INSERT INTO run_log(run_at,item,status,message) VALUES (?,?,?,?)",
@@ -175,6 +186,7 @@ def run(db_path, fetch=http_fetch, page_len=PAGE_LEN):
 
 # ----------------------------------------------------------------------------------------------
 def _selftest():
+    import re
     import tempfile
     from urllib.parse import urlparse, parse_qs
     qh = [["2026-10-16", "770", "3", "700", "4", "629", "3", "", "", ""], ["2026-10-09", "767", "13", "696", "12", "626", "10", "", "", ""],
@@ -185,11 +197,13 @@ def _selftest():
     for r in ("山西", "陕西", "蒙西", "蒙东"):
         DATA[f"CCTD{r}价格指数"] = org
     calls = []
+    sinces = {}
 
     def fake(url):
         q = parse_qs(urlparse(url).query.replace("%Y", "%25Y"), encoding="gb18030")
         name, start, length = q["data"][0], int(q["start"][0]), int(q["length"][0])
         calls.append(name)
+        sinces[name] = re.search(r"%27(-?\d{4}-\d{2}-\d{2})%27", url).group(1)
         rows = DATA[name]
         return json.dumps({"draw": 1, "recordsTotal": len(rows), "recordsFiltered": len(rows), "data": rows[start:start + length]})
 
@@ -197,15 +211,27 @@ def _selftest():
     assert run(tmp, fetch=fake, page_len=2) == 0
     c = sqlite3.connect(tmp)
     cnt = lambda s: c.execute("SELECT COUNT(*) FROM coal_price WHERE series=?", (s,)).fetchone()[0]
-    assert cnt("qhd_zh_0") == 3 and cnt("qhd_zh_2") == 3, "综合交易价应只保留 2025-01-01 起的 3 行（2024 年那行被过滤）"
+    assert cnt("qhd_zh_0") == 4 and cnt("qhd_zh_2") == 4, "不再按 2025-01-01 截断：2024 年那行也要入库"
     assert cnt("qhd_lx_0") == 1 and cnt("qhd_xh_1") == 2
     assert cnt("or_sx_0") == 2 and cnt("hl_0") == 2
     assert c.execute("SELECT value FROM coal_price WHERE series='qhd_zh_1' AND date='2026-10-16'").fetchone()[0] == 700.0
     assert c.execute("SELECT date,value,site_delta FROM coal_price WHERE series='or_sx_0' ORDER BY date").fetchall() == [("2025-11-01", 641.0, None), ("2026-09-01", 843.0, 92.0)]
     assert c.execute("SELECT label FROM coal_series WHERE series='qhd_zh_2'").fetchone()[0] == "4500大卡"
     assert len(calls) > len(BLOCKS), "page_len=2 时 4 行的来源应翻页"
+    assert set(sinces.values()) == {FULL_HISTORY}, "首次应取全部历史"
     n1 = c.execute("SELECT COUNT(*) FROM coal_price").fetchone()[0]
+    assert run(tmp, fetch=fake, page_len=2) == 0
+    assert sinces["CCTD秦皇岛动力煤价格"] == "2026-08-17", sinces["CCTD秦皇岛动力煤价格"]      # 2026-10-16 往前 60 天
+    assert sinces["黄陵指数"] == "2026-08-15" and sinces["CCTD山西价格指数"] == "2026-07-03", sinces      # 月度记 2026-09-01
     assert run(tmp, fetch=fake, page_len=2) == 0 and c.execute("SELECT COUNT(*) FROM coal_price").fetchone()[0] == n1, "重复运行不应产生重复行"
+    # 站点若把单页行数截断（比如无论 length 多大都只回 1 行），也要能翻页取全
+    def capped(url):
+        j = json.loads(fake(url)); j["data"] = j["data"][:1]; return json.dumps(j)
+    tmp2 = os.path.join(tempfile.mkdtemp(), "c2.db")
+    assert run(tmp2, fetch=capped, page_len=1000) == 0
+    c2 = sqlite3.connect(tmp2)
+    assert c2.execute("SELECT COUNT(*) FROM coal_price").fetchone()[0] == n1, "单页被截断时应翻页取全，行数应与正常一致"
+    c2.close()
     # 一个来源挂掉：其余照常，退出码仍为 0
     def flaky(url):
         if "%C8%B7" in url or "CCTD" not in unquote(url, encoding="gb18030") or "黄陵" in unquote(url, encoding="gb18030"):

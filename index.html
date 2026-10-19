@@ -243,6 +243,10 @@ function renderIndBar(){
   mt.className="ind-btn"+(curTop==="metals"?" on":"");
   mt.textContent="金属"; mt.onclick=()=>selectMetals();
   bar.appendChild(mt);
+  const cl=document.createElement("button");    // 煤炭模块
+  cl.className="ind-btn"+(curTop==="coal"?" on":"");
+  cl.textContent="煤炭"; cl.onclick=()=>selectCoal();
+  bar.appendChild(cl);
   const ag=document.createElement("button");    // 农产品模块
   ag.className="ind-btn"+(curTop==="agri"?" on":"");
   ag.textContent="农产品"; ag.onclick=()=>selectAgri();
@@ -255,10 +259,6 @@ function renderIndBar(){
   ef.className="ind-btn"+(curTop==="etf"?" on":"");
   ef.textContent="ETF·两融"; ef.onclick=()=>selectEtf();
   bar.appendChild(ef);
-  const cl=document.createElement("button");    // 煤炭模块
-  cl.className="ind-btn"+(curTop==="coal"?" on":"");
-  cl.textContent="煤炭"; cl.onclick=()=>selectCoal();
-  bar.appendChild(cl);
   document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf");
 }
 
