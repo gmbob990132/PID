@@ -1,4 +1,4 @@
-name: probe-coal4
+name: probe-coal5
 on:
   workflow_dispatch: {}
 jobs:
@@ -9,4 +9,4 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python3 probe_coal4.py
+      - run: python3 probe_coal5.py
