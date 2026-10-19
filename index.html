@@ -255,6 +255,10 @@ function renderIndBar(){
   ef.className="ind-btn"+(curTop==="etf"?" on":"");
   ef.textContent="ETF·两融"; ef.onclick=()=>selectEtf();
   bar.appendChild(ef);
+  const cl=document.createElement("button");    // 煤炭模块
+  cl.className="ind-btn"+(curTop==="coal"?" on":"");
+  cl.textContent="煤炭"; cl.onclick=()=>selectCoal();
+  bar.appendChild(cl);
   document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf");
 }
 
@@ -1035,6 +1039,87 @@ function renderMarginPane(pane){
     tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(1)+" 亿"},
     yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
     series:[{name:"融券余额",type:"line",showSymbol:false,connectNulls:true,data:rq,lineStyle:{width:2},itemStyle:{color:"#8a5cc8"}}]});
+}
+
+// ================== 煤炭模块（CCTD 中国煤炭市场网：秦皇岛 / 产地指数 / 黄陵气煤；每日检查更新）==================
+const COAL_SUBS=[["qhd","秦皇岛动力煤"],["origin","产地动力煤"],["hl","延安（黄陵）气煤"]];
+let coalData=null, coalErr="", coalSub="qhd", coalSel={};          // coalSel[块id] = 当前选中的序列下标（决定下方图表画哪条）
+
+async function selectCoal(){
+  curTop="coal"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
+  renderIndBar(); renderCoalSubBar();
+  document.getElementById("pane").innerHTML='<div class="empty">加载中…</div>';
+  coalErr="";
+  try{ coalData=await loadCached("coal_api/coal.json"); }
+  catch(e){ coalData=null; coalErr="煤炭数据还没有生成。请到仓库 Actions 页面手动运行一次 coal-daily。"; }
+  renderCoalPane();
+}
+function renderCoalSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  COAL_SUBS.forEach(([k,lb])=>{
+    const b=document.createElement("button");
+    b.className="sub-btn"+(k===coalSub?" on":""); b.textContent=lb;
+    b.onclick=()=>{ coalSub=k; renderCoalSubBar(); renderCoalPane(); };
+    bar.appendChild(b);
+  });
+}
+function coalFmt(v){ return v==null?"—":Number(v).toLocaleString(undefined,{maximumFractionDigits:2}); }
+function coalChg(o){                          // {delta,pct} → 红涨绿跌
+  if(!o||o.delta==null) return '<span class="flat">—</span>';
+  const cls=o.delta>0?"up":(o.delta<0?"down":"flat"), a=o.delta>0?"▲ +":(o.delta<0?"▼ ":"— ");
+  return '<span class="'+cls+'">'+a+(o.delta===0?"0":coalFmt(o.delta))+(o.pct==null?"":' ('+(o.pct>0?"+":"")+o.pct.toFixed(2)+'%)')+'</span>';
+}
+function coalDoy(ds){ const [y,m,d]=ds.split("-").map(Number); return Math.round((Date.UTC(y,m-1,d)-Date.UTC(y,0,0))/86400000); }   // 1 月 1 日 = 1
+function coalBlocks(g){                       // 产地四省区合并成一块（共用一张图，点卡片切换省区）
+  if(g.key!=="origin") return g.blocks;
+  const bs=g.blocks.filter(b=>b.series.length); if(!bs.length) return [];
+  return [{id:"origin", title:"产地动力煤价格指数", unit:bs[0].unit, freq:bs[0].freq, series:bs.map(b=>Object.assign({}, b.series[0], {label:b.title}))}];
+}
+
+function renderCoalPane(){
+  const pane=document.getElementById("pane"); erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[];
+  if(coalErr||!coalData){ pane.innerHTML='<div class="empty">'+esc(coalErr||"暂无数据")+'</div>'; return; }
+  const g=coalData.groups.find(x=>x.key===coalSub), blocks=g?coalBlocks(g):[];
+  if(!blocks.length){ pane.innerHTML='<div class="empty">这一组还没有数据</div>'; return; }
+  let h='<div class="erp-chart-sub" style="margin:0 2px 10px">数据来源：'+esc(coalData.source)+'；每天自动检查更新（有新数据才会变化）；红涨绿跌；点击卡片切换下方图表。'+
+    (coalData.failed&&coalData.failed.length?'<br><span class="down">最近一次更新有 '+coalData.failed.length+' 项失败：'+esc(coalData.failed.map(x=>x.item).join("、"))+'（页面显示的是上次成功的数据）</span>':'')+'</div>';
+  blocks.forEach(b=>{
+    const i0=Math.min(coalSel[b.id]||0, b.series.length-1);
+    h+='<div class="etf-head" style="margin-top:14px"><span class="t">'+esc(b.title)+'</span><span class="chip">'+esc(b.freq)+'</span>'+
+      '<span class="upd">数据至 '+esc(b.series.reduce((m,s)=>s.latest.date>m?s.latest.date:m,""))+'（'+esc(b.unit)+'）</span></div>';
+    h+='<div class="grid etf-cards" style="margin-top:10px">';
+    b.series.forEach((s,i)=>{
+      const yo=s.yoy;
+      h+='<div class="card etf-card'+(i===i0?' sel':'')+'" data-b="'+esc(b.id)+'" data-i="'+i+'" style="border-left:4px solid '+ETF_COLORS[i%ETF_COLORS.length]+'">'+
+        '<div class="nm">'+esc(s.label)+'</div>'+
+        '<div class="val">'+coalFmt(s.latest.value)+' <span class="u">'+esc(b.unit)+'</span></div>'+
+        '<div class="chg">环比 '+coalChg(s.mom)+'</div>'+
+        '<div class="yoy">同比 '+(yo?coalChg(yo)+' <span class="u">（对比 '+esc(yo.ref_date.slice(0,b.freq==="月度"?7:10))+'）</span>':'<span class="flat">—</span> <span class="u">（历史不足一年）</span>')+'</div>'+
+        '<div class="meta-line">数据日期 '+esc(b.freq==="月度"?s.latest.date.slice(0,7):s.latest.date)+'</div></div>';
+    });
+    h+='</div>';
+    h+='<div class="erp-chart-title" style="margin-top:16px">'+esc(b.title)+' · '+esc(b.series[i0].label)+' · 今年 vs 去年</div><div class="erp-chart-sub">蓝线：今年；灰线：去年同期；横轴为月份，鼠标悬停可看各自的实际日期与价格</div><div class="erp-chart" id="coalc_'+esc(b.id)+'"></div>';
+  });
+  pane.innerHTML=h;
+  pane.querySelectorAll(".etf-card[data-b]").forEach(el=>el.onclick=()=>{ coalSel[el.dataset.b]=+el.dataset.i; renderCoalPane(); });
+  blocks.forEach(b=>{
+    const s=b.series[Math.min(coalSel[b.id]||0, b.series.length-1)], pts=s.points;
+    const cy=+pts[pts.length-1][0].slice(0,4), py=cy-1, unit=b.unit;
+    const mk=y=>pts.filter(p=>+p[0].slice(0,4)===y).map(p=>[coalDoy(p[0]), p[1], p[0]]);
+    const cur=mk(cy), prev=mk(py), sym=pts.length<=40||cur.length<=14;
+    const line=(name,data,color,w)=>({name,type:"line",data,showSymbol:sym,symbolSize:5,connectNulls:true,lineStyle:{width:w,color},itemStyle:{color},emphasis:{focus:"series"}});
+    const c=echarts.init(document.getElementById("coalc_"+b.id));
+    c.setOption({
+      grid:{left:8,right:16,top:34,bottom:24,containLabel:true},
+      legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3},
+      tooltip:{trigger:"axis",formatter:ps=>ps.filter(p=>p.data).map(p=>p.marker+p.seriesName+"（"+p.data[2]+"）：<b>"+coalFmt(p.data[1])+"</b> "+unit).join("<br>")||""},
+      xAxis:{type:"value",min:1,max:366,interval:30.4375,splitLine:{show:false},axisLine:{lineStyle:{color:"#ddd"}},
+        axisLabel:{color:"#888",formatter:v=>{ const k=Math.round((v-1)/30.4375); return (k>=0&&k<12)?(k+1)+"月":""; }}},
+      yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},
+      series:[line(py+"年",prev,"#a9b2bf",1.8), line(cy+"年",cur,"#2a6fdb",2.6)],
+    });
+    erpCharts.push(c);
+  });
 }
 
 async function selectTech(){
