@@ -1,7 +1,7 @@
 name: valuation-daily
 on:
   schedule:
-    - cron: '0 23 * * *'      # UTC 23:00 = 北京次日 07:00
+    - cron: '0 22 * * *'      # UTC 23:00 = 北京次日 07:00
   workflow_dispatch: {}
 permissions:
   contents: write
