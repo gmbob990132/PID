@@ -3,7 +3,7 @@
 """
 ETF 份额 + 融资融券 模块 · 导出（只读 data/etf.db，写 etf_api/ 下 JSON，前端只读这些）
 
-  etf_api/etf.json     两组 ETF（沪深300 / 中证500）：日期轴 + 每只 ETF 的总份额序列（单位：亿份，缺失为 null）
+  etf_api/etf.json     四组 ETF（沪深300 / 上证50 / 中证500 / 科创50）：日期轴 + 每只 ETF 的总份额序列（单位：亿份，缺失为 null）
   etf_api/margin.json  融资融券：日期轴 + 全市场/沪/深 各指标序列（单位：亿元）
   etf_api/meta.json    生成时间、最新日期、最近一次运行状态
 """
@@ -14,7 +14,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-GROUP_NAMES = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF"}
+GROUP_NAMES = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF", "kc50": "科创50 ETF"}
 MARGIN_FIELDS = ["rzye", "rzmre", "rzche", "rqye", "rzrqye"]      # 融资余额/融资买入额/融资偿还额/融券余额/两融余额
 
 
@@ -66,7 +66,7 @@ def export(db_path, out_dir):
         "etf_latest": max((g["dates"][-1] for g in groups.values() if g["dates"]), default=None),
         "margin_latest": dates[-1] if dates else None})
     conn.close()
-    print(f"导出完成 → {out_dir}：ETF 两组 {sum(len(g['funds']) for g in groups.values())} 只；融资融券 {len(dates)} 天")
+    print(f"导出完成 → {out_dir}：ETF 四组 {sum(len(g['funds']) for g in groups.values())} 只；融资融券 {len(dates)} 天")
 
 
 if __name__ == "__main__":

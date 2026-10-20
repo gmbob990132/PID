@@ -4,7 +4,7 @@
 ETF 份额 + 融资融券 模块 · 采集落库（Tushare）
 
 数据：
-  - ETF 总份额：Tushare fund_share（单位 万份）。沪深300 ETF 6 只（固定），中证500 ETF 头部 6 只（首次运行按"份额×收盘价"自动挑选，
+  - ETF 总份额：Tushare fund_share（单位 万份）。沪深300 ETF 6 只（固定），中证500 / 上证50 / 科创50 ETF 头部 6 只（首次运行按"份额×收盘价"自动挑选，
     结果写进 etf_config/etfs.json，之后一直沿用，保证图上的 ETF 集合稳定；想换就改这个文件）
   - 融资融券：Tushare margin（沪/深/北三所汇总，单位 元）
 落库：data/etf.db   表：etf_funds / etf_share / margin / run_log
@@ -31,12 +31,16 @@ BACKFILL_DAYS = 365 * 3 + 5
 OVERLAP_DAYS = 15
 HS300 = ["510300.SH", "510310.SH", "510320.SH", "510330.SH", "510350.SH", "159919.SZ"]
 N_CSI500 = 6
-GROUPS = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF"}
+GROUPS = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF", "kc50": "科创50 ETF"}
 # 自动挑选规则：group → (基准里必须含有的关键词, 名称里必须含有的关键词, 额外排除的名称正则)
 PICK_RULES = {
     "csi500": ("中证500", "500", None),
     "sse50": ("上证50指数", "50", r"科创|创业|中证|等权|深证|沪深"),
+    "kc50": ("科创板50", "50", r"创业|科创100|科创200|中证|综指"),
 }
+# 仅用于"规模排名日志"（不用于自动挑选）：沪深300 也列出来，方便核对页面上的清单是否漏了大的 ETF
+RANK_RULES = dict(PICK_RULES)
+RANK_RULES["hs300"] = ("沪深300", "300", r"创业|科创|中证|等权|深证")
 
 # ---------------- Tushare 限速 + 超限重试 ----------------
 _TS_MAX = int(os.environ.get("TUSHARE_MAX_CALLS_PER_MIN", "45"))
@@ -118,9 +122,9 @@ def log(conn, item, status, rows, msg=""):
 _EXCL = re.compile(r"增强|质量|价值|成长|现金流|低波|红利|ESG|等权|联接|LOF|基本面|动量|因子|量化|医药|消费|科技|周期")
 
 
-def pick_funds(pro, basic, group, n=N_CSI500):
-    """候选：基准为目标指数、名称里不含增强/风格后缀的 ETF；按 份额×收盘价（≈规模）取前 n。"""
-    bench_kw, name_kw, extra_excl = PICK_RULES[group]
+def rank_funds(pro, basic, group, rules=None):
+    """候选：基准为目标指数、名称里不含增强/风格后缀的 ETF；按 份额×收盘价（≈规模）从大到小。返回 [(规模万元, code, name)]。"""
+    bench_kw, name_kw, extra_excl = (rules or PICK_RULES)[group]
     cand = basic[basic["benchmark"].astype(str).str.contains(bench_kw, na=False)
                  & basic["name"].astype(str).str.contains(name_kw)
                  & ~basic["name"].astype(str).str.contains(_EXCL)]
@@ -140,10 +144,32 @@ def pick_funds(pro, basic, group, n=N_CSI500):
         except Exception as ex:  # noqa: BLE001
             print(f"  ⚠ 候选 {code} 取数失败：{str(ex)[:80]}")
     scored.sort(reverse=True)
+    return scored
+
+
+def pick_funds(pro, basic, group, n=N_CSI500):
+    scored = rank_funds(pro, basic, group)
     print(f"  {GROUPS[group]} 候选规模排名（份额万份×收盘价，单位≈万元）：")
     for sc, code, name in scored[:12]:
         print(f"    {code}  {name:<22} {sc / 1e4:>10.1f} 亿元")
     return [c for _, c, _ in scored[:n]]
+
+
+def print_rankings(pro, basic, cfg):
+    """手动运行（workflow_dispatch）或 ETF_RANK=1 时，打印四个指数的全市场 ETF 规模前 15，★ = 已在页面清单里。"""
+    for g in GROUPS:
+        try:
+            scored = rank_funds(pro, basic, g, RANK_RULES)
+        except Exception as ex:  # noqa: BLE001
+            print(f"  ⚠ {GROUPS[g]} 规模排名失败：{str(ex)[:100]}")
+            continue
+        print(f"\n【规模排名】{GROUPS[g]}（份额×收盘价，亿元；★=在页面清单里，共 {len(scored)} 只候选）")
+        for i, (sc, code, name) in enumerate(scored[:15], 1):
+            print(f"  {i:>2}. {'★' if code in cfg.get(g, []) else ' '} {code:<10} {name:<24} {sc / 1e4:>9.1f}")
+        miss = [(i, code, name) for i, (_, code, name) in enumerate(scored[:6], 1) if code not in cfg.get(g, [])]
+        if miss:
+            print("  ⚠ 规模前6但不在页面清单：" + "、".join(f"第{i}名 {c} {n}" for i, c, n in miss))
+    print()
 
 
 def load_config(pro, basic):
@@ -182,6 +208,8 @@ def run(db_path, pro, offline=False):
         basic = ts_call(pro.fund_basic, market="E", status="L")
         cfg, names = load_config(pro, basic)
         n_ok = n_fail = 0
+        if not offline and (os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch" or os.environ.get("ETF_RANK") == "1"):
+            print_rankings(pro, basic, cfg)
 
         # 清单（含名称）
         conn.execute("DELETE FROM etf_funds")
@@ -259,7 +287,8 @@ class _FakePro:
         rows += [("510500.SH", "南方中证500ETF", "中证500指数收益率"), ("159922.SZ", "嘉实中证500ETF", "中证500指数收益率"),
                  ("510050.SH", "华夏上证50ETF", "上证50指数收益率"), ("510710.SH", "博时上证50ETF", "上证50指数收益率"),
                  ("510850.SH", "工银上证50ETF", "上证50指数收益率"), ("510100.SH", "南方上证50ETF", "上证50指数收益率"),
-                 ("588080.SH", "易方达科创50ETF", "上证科创板50成份指数收益率"), ("510680.SH", "万家上证50增强ETF", "上证50指数收益率"),
+                 ("588080.SH", "易方达科创50ETF", "上证科创板50成份指数收益率"), ("588000.SH", "华夏科创50ETF", "上证科创板50成份指数收益率"),
+                 ("588200.SH", "嘉实科创芯片ETF", "上证科创板芯片指数收益率"), ("588360.SH", "科创创业50ETF", "中证科创创业50指数收益率"), ("510680.SH", "万家上证50增强ETF", "上证50指数收益率"),
                  ("512500.SH", "华夏中证500ETF", "中证500指数收益率"), ("510510.SH", "广发中证500ETF", "中证500指数收益率"),
                  ("159820.SZ", "天弘中证500ETF", "中证500指数收益率"), ("512510.SH", "华泰柏瑞中证500ETF", "中证500指数收益率"),
                  ("159337.SZ", "东财中证500ETF", "中证500指数收益率"), ("561950.SH", "招商中证500增强策略ETF", "中证500指数收益率"),
@@ -305,6 +334,8 @@ def selftest():
     assert sse == {"510050.SH", "510710.SH", "510850.SH", "510100.SH"}, sse       # 科创50、增强 被排除
     picked = {r[0] for r in conn.execute("SELECT code FROM etf_funds WHERE grp='csi500'")}
     assert "561950.SH" not in picked and "562340.SH" not in picked, picked      # 增强/风格 ETF 被排除
+    kc = {r[0] for r in conn.execute("SELECT code FROM etf_funds WHERE grp='kc50'")}
+    assert kc == {"588080.SH", "588000.SH"}, kc                                      # 科创创业50、芯片 被排除
     n1 = q("SELECT COUNT(*) FROM etf_share"); m1 = q("SELECT COUNT(*) FROM margin")
     assert n1 > 500 and m1 > 100
     conn.close()
@@ -312,7 +343,7 @@ def selftest():
     conn = sqlite3.connect(db)
     assert q("SELECT COUNT(*) FROM etf_share") == n1 and q("SELECT COUNT(*) FROM margin") == m1
     cfg = json.load(open(CFG_PATH, encoding="utf-8"))
-    assert len(cfg["csi500"]) == 6 and cfg["hs300"] == HS300 and len(cfg["sse50"]) == 4
+    assert len(cfg["csi500"]) == 6 and cfg["hs300"] == HS300 and len(cfg["sse50"]) == 4 and len(cfg["kc50"]) == 2
     print("selftest OK")
 
 
