@@ -44,8 +44,8 @@ METRICS = [
      "source_type": "free", "source_ref": "akshare_foreign_hist", "update_freq": "daily",
      "hide_chart": True, "params": {"symbol": "AHD"}},
     {"id": "al_lme_inv", "name": "LME库存", "category": "inventory", "unit": "万吨",
-     "source_type": "free", "source_ref": "akshare_lme_stock", "update_freq": "daily",
-     "params": {"metal": "铝"}},
+     "source_type": "free", "source_ref": "westmetall_lme_stock", "update_freq": "daily",
+     "params": {"field": "LME_Al_cash"}},
     {"id": "al_ingot_a00", "name": "A00铝锭", "category": "price", "unit": "元/吨",
      "source_type": "api", "source_ref": "mysteel_lv_table", "update_freq": "daily",
      "params": {"name": "A00铝锭", "region": "无锡"}},
@@ -231,6 +231,34 @@ def adapter_akshare_lme_stock(metrics):
     return out
 
 
+def adapter_westmetall_lme_stock(metrics):
+    """LME 库存（Westmetall 转载 LME 官方日报，吨→万吨）。
+    页面表头: date / Cash-Settlement / 3-month / stock；日期形如 '19. October 2026'。"""
+    if _SELFTEST:
+        return []
+    out = []
+    for m in metrics:
+        field = m.get("params", {}).get("field", "LME_Al_cash")
+        url = "https://www.westmetall.com/en/markdaten.php?action=table&field=" + field
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (PID dashboard; +https://github.com/gmbob990132/PID)"})
+        html = urlopen(req, timeout=60).read().decode("utf-8", "replace")
+        n0 = len(out)
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S | re.I):
+            tds = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S | re.I)]
+            if len(tds) < 4:
+                continue
+            try:
+                d = datetime.strptime(re.sub(r"\s+", " ", tds[0]).replace(".", ""), "%d %B %Y").date()
+                v = float(tds[3].replace(",", ""))
+            except ValueError:
+                continue
+            out.append({"metric_id": m["id"], "obs_date": str(d), "value": round(v / 10000.0, 2),
+                        "src_change": None, "source": "westmetall/" + field})
+        if len(out) == n0:
+            raise ValueError("Westmetall 页面未解析到库存行（页面结构可能变化）")
+    return out
+
+
 def adapter_akshare_spot_sys(metrics):
     """生意社现期图-市场价格（如氧化铝现货）。symbol 需匹配生意社品种名，自动适配。"""
     if _SELFTEST:
@@ -393,6 +421,7 @@ ADAPTERS = {
     "akshare_futures_main": adapter_akshare_futures_main,
     "akshare_foreign_hist": adapter_akshare_foreign_hist,
     "akshare_lme_stock": adapter_akshare_lme_stock,
+    "westmetall_lme_stock": adapter_westmetall_lme_stock,
     "akshare_spot_sys": adapter_akshare_spot_sys,
     "akshare_spot_price_daily": adapter_akshare_spot_price_daily,
     "manual_csv": adapter_manual_csv,
