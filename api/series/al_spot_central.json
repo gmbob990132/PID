@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-20T06:15:20+00:00",
+  "generated_at": "2026-10-21T06:14:31+00:00",
   "metric": {
     "id": "al_spot_central",
     "name": "现货·中原",
@@ -9,12 +9,6 @@
   },
   "range": "recent",
   "points": [
-    {
-      "date": "2026-08-31",
-      "value": 23850.0,
-      "change": 70.0,
-      "src_change": 70.0
-    },
     {
       "date": "2026-09-01",
       "value": 23990.0,
@@ -194,6 +188,12 @@
       "value": 23400.0,
       "change": -130.0,
       "src_change": -130.0
+    },
+    {
+      "date": "2026-10-21",
+      "value": 23480.0,
+      "change": 80.0,
+      "src_change": 80.0
     }
   ]
 }
