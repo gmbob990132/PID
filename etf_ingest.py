@@ -40,7 +40,10 @@ PICK_RULES = {
 }
 # 仅用于"规模排名日志"（不用于自动挑选）：沪深300 也列出来，方便核对页面上的清单是否漏了大的 ETF
 RANK_RULES = dict(PICK_RULES)
-RANK_RULES["hs300"] = ("沪深300", "300", r"创业|科创|中证|等权|深证")
+RANK_RULES["hs300"] = ("沪深300", "300", r"创业|科创|中证|等权|深证|非银|金融|银行|地产|医药|消费|红利")
+# 已知的大规模 ETF：不管 fund_basic 的基准/名称字段怎么写，排名日志里都强制带上并打印它们在 fund_basic 里的样子（排查"漏选"）
+WATCH = {"hs300": ["510320.SH", "510360.SH"], "sse50": ["510050.SH"],
+         "csi500": ["510500.SH", "512500.SH", "159922.SZ", "510580.SH", "510510.SH"], "kc50": []}
 
 # ---------------- Tushare 限速 + 超限重试 ----------------
 _TS_MAX = int(os.environ.get("TUSHARE_MAX_CALLS_PER_MIN", "45"))
@@ -122,7 +125,7 @@ def log(conn, item, status, rows, msg=""):
 _EXCL = re.compile(r"增强|质量|价值|成长|现金流|低波|红利|ESG|等权|联接|LOF|基本面|动量|因子|量化|医药|消费|科技|周期")
 
 
-def rank_funds(pro, basic, group, rules=None):
+def rank_funds(pro, basic, group, rules=None, extra=()):
     """候选：基准为目标指数、名称里不含增强/风格后缀的 ETF；按 份额×收盘价（≈规模）从大到小。返回 [(规模万元, code, name)]。"""
     bench_kw, name_kw, extra_excl = (rules or PICK_RULES)[group]
     cand = basic[basic["benchmark"].astype(str).str.contains(bench_kw, na=False)
@@ -131,9 +134,15 @@ def rank_funds(pro, basic, group, rules=None):
     if extra_excl:
         cand = cand[~cand["name"].astype(str).str.contains(extra_excl)]
     cand = cand[cand["name"].astype(str).str.contains("ETF")]
+    pairs = cand[["ts_code", "name"]].values.tolist()
+    seen = {c for c, _ in pairs}
+    nm = dict(basic[["ts_code", "name"]].values.tolist())
+    for c in extra:                                        # 规则外的指定代码（仅排名日志用）
+        if c not in seen:
+            pairs.append((c, "(规则外)" + str(nm.get(c, "不在fund_basic里"))))
     start, end = _ymd(date.today() - timedelta(days=14)), _ymd(date.today())
     scored = []
-    for code, name in cand[["ts_code", "name"]].values.tolist():
+    for code, name in pairs:
         try:
             sh = ts_call(pro.fund_share, ts_code=code, start_date=start, end_date=end)
             px = ts_call(pro.fund_daily, ts_code=code, start_date=start, end_date=end)
@@ -159,13 +168,19 @@ def print_rankings(pro, basic, cfg):
     """手动运行（workflow_dispatch）或 ETF_RANK=1 时，打印四个指数的全市场 ETF 规模前 15，★ = 已在页面清单里。"""
     for g in GROUPS:
         try:
-            scored = rank_funds(pro, basic, g, RANK_RULES)
+            scored = rank_funds(pro, basic, g, RANK_RULES, extra=list(cfg.get(g, [])) + WATCH.get(g, []))
         except Exception as ex:  # noqa: BLE001
             print(f"  ⚠ {GROUPS[g]} 规模排名失败：{str(ex)[:100]}")
             continue
         print(f"\n【规模排名】{GROUPS[g]}（份额×收盘价，亿元；★=在页面清单里，共 {len(scored)} 只候选）")
         for i, (sc, code, name) in enumerate(scored[:15], 1):
             print(f"  {i:>2}. {'★' if code in cfg.get(g, []) else ' '} {code:<10} {name:<24} {sc / 1e4:>9.1f}")
+        ranked = {c for _, c, _ in scored}
+        for c in list(cfg.get(g, [])) + WATCH.get(g, []):
+            if c not in ranked:
+                r = basic[basic["ts_code"] == c]
+                info = r[["name", "benchmark"]].values.tolist()[0] if len(r) else "不在 fund_basic 里"
+                print(f"  ⚠ {c} 没取到份额/收盘价，fund_basic 里是：{info}")
         miss = [(i, code, name) for i, (_, code, name) in enumerate(scored[:6], 1) if code not in cfg.get(g, [])]
         if miss:
             print("  ⚠ 规模前6但不在页面清单：" + "、".join(f"第{i}名 {c} {n}" for i, c, n in miss))
