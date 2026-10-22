@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-21T06:14:31+00:00",
+  "generated_at": "2026-10-22T06:18:32+00:00",
   "metric": {
     "id": "al_spot_south",
     "name": "现货·华南",
@@ -9,12 +9,6 @@
   },
   "range": "recent",
   "points": [
-    {
-      "date": "2026-09-01",
-      "value": 24290.0,
-      "change": 120.0,
-      "src_change": 120.0
-    },
     {
       "date": "2026-09-02",
       "value": 24320.0,
@@ -194,6 +188,12 @@
       "value": 23530.0,
       "change": 70.0,
       "src_change": 70.0
+    },
+    {
+      "date": "2026-10-22",
+      "value": 23620.0,
+      "change": 90.0,
+      "src_change": 90.0
     }
   ]
 }
