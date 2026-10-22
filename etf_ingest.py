@@ -31,19 +31,21 @@ BACKFILL_DAYS = 365 * 3 + 5
 OVERLAP_DAYS = 15
 HS300 = ["510300.SH", "510310.SH", "510320.SH", "510330.SH", "510350.SH", "159919.SZ"]
 N_CSI500 = 6
-GROUPS = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF", "kc50": "科创50 ETF"}
+GROUPS = {"hs300": "沪深300 ETF", "sse50": "上证50 ETF", "csi500": "中证500 ETF", "kc50": "科创50 ETF", "cyb": "创业板 ETF"}
 # 自动挑选规则：group → (基准里必须含有的关键词, 名称里必须含有的关键词, 额外排除的名称正则)
 PICK_RULES = {
     "csi500": ("中证500", "500", None),
     "sse50": ("上证50指数", "50", r"科创|创业|中证|等权|深证|沪深"),
     "kc50": ("科创板50", "50", r"创业|科创100|科创200|中证|综指"),
+    "cyb": ("创业板", "创业板", r"50|综指|人工智能|新能源|软件|大数据|半导体|芯片|电池|机器人|AI|创业板50"),
 }
 # 仅用于"规模排名日志"（不用于自动挑选）：沪深300 也列出来，方便核对页面上的清单是否漏了大的 ETF
 RANK_RULES = dict(PICK_RULES)
 RANK_RULES["hs300"] = ("沪深300", "300", r"创业|科创|中证|等权|深证|非银|金融|银行|地产|医药|消费|红利")
 # 已知的大规模 ETF：不管 fund_basic 的基准/名称字段怎么写，排名日志里都强制带上并打印它们在 fund_basic 里的样子（排查"漏选"）
 WATCH = {"hs300": ["510320.SH", "510360.SH"], "sse50": ["510050.SH"],
-         "csi500": ["510500.SH", "512500.SH", "159922.SZ", "510580.SH", "510510.SH"], "kc50": []}
+         "csi500": ["510500.SH", "512500.SH", "159922.SZ", "510580.SH", "510510.SH"], "kc50": [],
+         "cyb": ["159915.SZ", "159949.SZ", "159952.SZ", "159977.SZ", "159948.SZ", "159957.SZ"]}
 
 # ---------------- Tushare 限速 + 超限重试 ----------------
 _TS_MAX = int(os.environ.get("TUSHARE_MAX_CALLS_PER_MIN", "45"))
@@ -303,6 +305,8 @@ class _FakePro:
                  ("510050.SH", "华夏上证50ETF", "上证50指数收益率"), ("510710.SH", "博时上证50ETF", "上证50指数收益率"),
                  ("510850.SH", "工银上证50ETF", "上证50指数收益率"), ("510100.SH", "南方上证50ETF", "上证50指数收益率"),
                  ("588080.SH", "易方达科创50ETF", "上证科创板50成份指数收益率"), ("588000.SH", "华夏科创50ETF", "上证科创板50成份指数收益率"),
+                 ("159915.SZ", "易方达创业板ETF", "创业板指数收益率"), ("159949.SZ", "华安创业板50ETF", "创业板50指数收益率"),
+                 ("159952.SZ", "广发创业板ETF", "创业板指数收益率"), ("159967.SZ", "华夏创业板成长ETF", "创业板成长指数收益率"),
                  ("588200.SH", "嘉实科创芯片ETF", "上证科创板芯片指数收益率"), ("588360.SH", "科创创业50ETF", "中证科创创业50指数收益率"), ("510680.SH", "万家上证50增强ETF", "上证50指数收益率"),
                  ("512500.SH", "华夏中证500ETF", "中证500指数收益率"), ("510510.SH", "广发中证500ETF", "中证500指数收益率"),
                  ("159820.SZ", "天弘中证500ETF", "中证500指数收益率"), ("512510.SH", "华泰柏瑞中证500ETF", "中证500指数收益率"),
@@ -351,6 +355,8 @@ def selftest():
     assert "561950.SH" not in picked and "562340.SH" not in picked, picked      # 增强/风格 ETF 被排除
     kc = {r[0] for r in conn.execute("SELECT code FROM etf_funds WHERE grp='kc50'")}
     assert kc == {"588080.SH", "588000.SH"}, kc                                      # 科创创业50、芯片 被排除
+    cyb = {r[0] for r in conn.execute("SELECT code FROM etf_funds WHERE grp='cyb'")}
+    assert cyb == {"159915.SZ", "159952.SZ"}, cyb                                    # 创业板50、成长 被排除
     n1 = q("SELECT COUNT(*) FROM etf_share"); m1 = q("SELECT COUNT(*) FROM margin")
     assert n1 > 500 and m1 > 100
     conn.close()
@@ -358,7 +364,7 @@ def selftest():
     conn = sqlite3.connect(db)
     assert q("SELECT COUNT(*) FROM etf_share") == n1 and q("SELECT COUNT(*) FROM margin") == m1
     cfg = json.load(open(CFG_PATH, encoding="utf-8"))
-    assert len(cfg["csi500"]) == 6 and cfg["hs300"] == HS300 and len(cfg["sse50"]) == 4 and len(cfg["kc50"]) == 2
+    assert len(cfg["csi500"]) == 6 and cfg["hs300"] == HS300 and len(cfg["sse50"]) == 4 and len(cfg["kc50"]) == 2 and len(cfg["cyb"]) == 2
     print("selftest OK")
 
 
