@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-22T14:29:38+00:00",
+  "generated_at": "2026-10-23T00:57:58+00:00",
   "module": "aluminum",
-  "today": "2026-10-22",
+  "today": "2026-10-23",
   "metrics": [
     {
       "id": "al_spot_east",
@@ -21,9 +21,9 @@
         "src_change": 100.0,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 6
       }
@@ -45,9 +45,9 @@
         "src_change": 90.0,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 6
       }
@@ -69,9 +69,9 @@
         "src_change": 100.0,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 6
       }
@@ -93,9 +93,9 @@
         "src_change": -3.5,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 2
       }
@@ -117,11 +117,11 @@
         "src_change": null,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
-        "rows_written": 262
+        "rows_written": 261
       }
     },
     {
@@ -141,11 +141,11 @@
         "src_change": null,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
-        "rows_written": 262
+        "rows_written": 261
       }
     },
     {
@@ -158,18 +158,18 @@
       "hide_overview": false,
       "hide_chart": true,
       "latest": {
-        "date": "2026-10-22",
-        "value": 3008.5,
-        "mom": -18.5,
-        "yoy": 203.0,
+        "date": "2026-10-23",
+        "value": 3005.5,
+        "mom": 0.0,
+        "yoy": 141.5,
         "src_change": null,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
-        "rows_written": 2537
+        "rows_written": 2538
       }
     },
     {
@@ -191,9 +191,9 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
-        "status": "ok",
-        "rows_written": 204
+        "run_at": "2026-10-23T00:57:49+00:00",
+        "status": "failed",
+        "rows_written": 0
       }
     },
     {
@@ -213,9 +213,9 @@
         "src_change": 0.0,
         "region": "山西"
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -237,9 +237,9 @@
         "src_change": 90.0,
         "region": "无锡"
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -261,9 +261,9 @@
         "src_change": 0.0,
         "region": "山东"
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -285,9 +285,9 @@
         "src_change": null,
         "region": null
       },
-      "updated_today": true,
+      "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-22T14:29:29+00:00",
+        "run_at": "2026-10-23T00:57:49+00:00",
         "status": "ok",
         "rows_written": 45
       }
