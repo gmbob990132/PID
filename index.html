@@ -564,7 +564,7 @@ function erpFormulaHtml(last, peS){
     const ey=100/pt.value, y10=ey-last.value;
     comp='<div style="margin-top:3px">'+esc(last.date)+'：100 ÷ '+pt.value.toFixed(2)+' = '+ey.toFixed(2)+'%　−　国债 '+y10.toFixed(2)+'%　＝　'+last.value.toFixed(2)+'%</div>';
   }
-  return '<div style="font-size:11.5px;color:#999;margin-top:8px;line-height:1.55;border-top:1px dashed #e3e3e3;padding-top:6px">'+
+  return '<div style="flex:1 1 280px;min-width:240px;font-size:11.5px;color:#999;line-height:1.6;border-left:1px dashed #e3e3e3;padding-left:20px">'+
     '<b style="color:#777">公式</b>：股权溢价 = 100 ÷ 沪深300 PE(TTM) − 10年期国债收益率（%）<br>'+
     '即“股票盈利收益率（E/P）减去无风险收益率”；越高说明股票相对债券越便宜。'+comp+'</div>';
 }
@@ -588,10 +588,11 @@ async function drawCsi300Erp(){
     const pcls=(pos)=> pos==null?"flat":(pos>=0.8?"down":(pos<=0.2?"up":"flat"));  // ERP高分位=便宜=绿(down)
     const pl=(lab,pos)=> '<div class="'+pcls(pos)+'" style="font-size:12.5px;margin-top:4px;font-weight:600">'+
       lab+' '+(pos==null?"—":Math.round(pos*100)+"%")+'</div>';
-    head.innerHTML='<div class="grid"><div class="card">'+
-      '<div class="nm">股权溢价指数</div>'+
-      '<div><span class="val">'+cur.toFixed(2)+'%</span></div>'+
-      pl("近5年百分位",p5)+pl("近10年百分位",p10)+erpFormulaHtml(erpAll[erpAll.length-1], peS)+'</div></div>';
+    head.innerHTML='<div class="card" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px">'+
+      '<div style="min-width:120px"><div class="nm">股权溢价指数</div>'+
+        '<div><span class="val">'+cur.toFixed(2)+'%</span></div></div>'+
+      '<div style="min-width:130px">'+pl("近5年百分位",p5)+pl("近10年百分位",p10)+'</div>'+
+      erpFormulaHtml(erpAll[erpAll.length-1], peS)+'</div>';
   }
   // 图（按显示范围裁剪）
   const closeF=fltRange(close.points||[]), erpF=fltRange(erpAll);
@@ -823,10 +824,14 @@ function agriPctEst(v,p20,p50,p80){
 function agriLowHtml(p,pct,histLow){
   const L=p.latest, parts=[];
   if(p.p50) parts.push('较中位数 '+((L.value/p.p50-1)*100).toFixed(1)+'%');
-  if(pct!=null) parts.push('历史分位 '+(p.pct!=null? pct*100 : pct*100).toFixed(p.pct!=null?1:0)+'%'+(p.pct!=null&&p.pct_years?'（近'+p.pct_years+'年）':'（估）'));
+  if(p.pct!=null) parts.push('历史分位 '+(pct*100).toFixed(1)+'%'+(p.pct_years?'（近'+p.pct_years+'年）':''));
+  else parts.push('历史分位 低于20%（粗估，待数据更新）');
   let h='<div style="font-size:12px;margin-top:4px;color:#0f6e56;font-weight:600">'+parts.join('　')+'</div>';
   if(histLow) h+='<div style="font-size:12px;margin-top:3px;color:#b3261e;font-weight:700">★ 创历史最低'+(p.hist_min_prev!=null?'（前低 '+Number(p.hist_min_prev).toLocaleString()+(p.hist_min_prev_date?'，'+esc(p.hist_min_prev_date):'')+'）':'')+'</div>';
-  else if(p.hist_min!=null) h+='<div style="font-size:11.5px;margin-top:3px;color:#999">历史最低 '+Number(p.hist_min).toLocaleString()+(p.hist_min_date?'（'+esc(p.hist_min_date)+'）':'')+'</div>';
+  else if(p.hist_min!=null){
+    const gap=p.hist_min? (L.value/p.hist_min-1)*100 : null;
+    h+='<div style="font-size:11.5px;margin-top:3px;color:'+(gap!=null&&gap<=3?'#b3261e':'#999')+'">'+(gap!=null&&gap<=3?'接近历史最低：':'历史最低 ')+Number(p.hist_min).toLocaleString()+(p.hist_min_date?'（'+esc(p.hist_min_date)+'）':'')+(gap!=null?'，现价高 '+gap.toFixed(1)+'%':'')+'</div>';
+  }
   return h;
 }
 function renderAgri(){
