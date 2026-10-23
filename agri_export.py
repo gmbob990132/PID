@@ -67,9 +67,27 @@ def export(db_path, out_dir):
         latest = pts[-1] if pts else None
         prev = pts[-2] if len(pts) >= 2 else None
         change = round(latest["value"] - prev["value"], 1) if (latest and prev) else None
+        # 历史分位（近10年内，<=最新值的占比）+ 历史最低标记（与全部历史比）
+        pct = pct_years = None
+        if latest and len(vals) >= 30:
+            pct = round(sum(1 for v in vals if v <= latest["value"]) / len(vals), 4)
+            span = (datetime.strptime(pts[-1]["date"], "%Y-%m-%d") - datetime.strptime(max(pts[0]["date"], cutoff), "%Y-%m-%d")).days
+            pct_years = min(MAX_YEARS, max(1, round(span / 365)))
+        hist_min = hist_min_date = prev_min = prev_min_date = None
+        is_hist_low = False
+        if pts:
+            mn = min(pts, key=lambda x: x["value"]); hist_min, hist_min_date = mn["value"], mn["date"]
+            if len(pts) >= 250:                                   # 历史太短时不标"历史最低"
+                prev = min(pts[:-1], key=lambda x: x["value"])
+                prev_min, prev_min_date = prev["value"], prev["date"]
+                is_hist_low = latest["value"] <= prev_min
         cards.append({"id": pid, "name": m["name"], "unit": m["unit"],
                       "latest": latest, "change": change,
-                      "p20": p20, "p50": p50, "p80": p80, "n": len(vals)})
+                      "p20": p20, "p50": p50, "p80": p80, "n": len(vals),
+                      "pct": pct, "pct_years": pct_years,
+                      "hist_min": hist_min, "hist_min_date": hist_min_date,
+                      "hist_min_prev": prev_min, "hist_min_prev_date": prev_min_date,
+                      "is_hist_low": is_hist_low})
 
     _write(os.path.join(out_dir, "overview.json"),
            {"schema_version": SCHEMA_VERSION, "generated_at": gen, "module": "agri",

@@ -482,7 +482,7 @@ async function renderValPane(){
   if(idx==="csi300"){
     html+='<div class="erp-chart-title" style="margin-top:22px">股权溢价指数（股债性价比）</div>';
     html+='<div id="erphead" style="margin:6px 0 10px"></div>';
-    html+='<div class="erp-chart-sub">点位（左轴）+ 股权溢价指数%（右轴）</div><div class="erp-chart" id="erpc1"></div>';
+    html+='<div class="erp-chart-sub">点位（左轴）+ 股权溢价指数%（右轴）；股权溢价 = 100÷PE(TTM) − 10年期国债收益率</div><div class="erp-chart" id="erpc1"></div>';
     html+='<div class="erp-chart-sub" id="erpsub2"></div><div class="erp-chart" id="erpc2"></div>';
     html+='<div id="divSec" style="display:none">'+
       '<div class="erp-chart-title" style="margin-top:22px">中美分化（沪深300 ÷ 标普500）</div>'+
@@ -556,14 +556,27 @@ function _posWithin(points, latest, years){
 }
 function erpAbsClass(v){ return v==null?"flat":(v>=6?"down":(v<=3?"up":"flat")); }  // 高=便宜=绿(down)，低=贵=红(up)
 
+// 公式说明：股权溢价 = 盈利收益率(100÷PE_TTM) − 10年期国债收益率；并列出最新一天的各分项
+function erpFormulaHtml(last, peS){
+  let comp="";
+  const pt=peS&&(peS.points||[]).find(p=>p.date===last.date);
+  if(pt&&pt.value){
+    const ey=100/pt.value, y10=ey-last.value;
+    comp='<div style="margin-top:3px">'+esc(last.date)+'：100 ÷ '+pt.value.toFixed(2)+' = '+ey.toFixed(2)+'%　−　国债 '+y10.toFixed(2)+'%　＝　'+last.value.toFixed(2)+'%</div>';
+  }
+  return '<div style="font-size:11.5px;color:#999;margin-top:8px;line-height:1.55;border-top:1px dashed #e3e3e3;padding-top:6px">'+
+    '<b style="color:#777">公式</b>：股权溢价 = 100 ÷ 沪深300 PE(TTM) − 10年期国债收益率（%）<br>'+
+    '即“股票盈利收益率（E/P）减去无风险收益率”；越高说明股票相对债券越便宜。'+comp+'</div>';
+}
 async function drawCsi300Erp(){
-  let close, erp, perc;
+  let close, erp, perc, peS=null;
   try{
     [close, erp, perc] = await Promise.all([
       loadCached("erp_api/csi300/series/close.full.json"),
       loadCached("erp_api/csi300/series/erp.full.json"),
       loadCached("erp_api/csi300/percentiles.json"),
     ]);
+    peS = await loadCached("erp_api/csi300/series/pe_ttm.full.json").catch(()=>null);
   }catch(e){ return; }
   // 头部：当前 ERP + 近5年/近10年百分位（从全量历史算）
   const erpAll=erp.points||[];
@@ -578,7 +591,7 @@ async function drawCsi300Erp(){
     head.innerHTML='<div class="grid"><div class="card">'+
       '<div class="nm">股权溢价指数</div>'+
       '<div><span class="val">'+cur.toFixed(2)+'%</span></div>'+
-      pl("近5年百分位",p5)+pl("近10年百分位",p10)+'</div></div>';
+      pl("近5年百分位",p5)+pl("近10年百分位",p10)+erpFormulaHtml(erpAll[erpAll.length-1], peS)+'</div></div>';
   }
   // 图（按显示范围裁剪）
   const closeF=fltRange(close.points||[]), erpF=fltRange(erpAll);
@@ -806,19 +819,32 @@ function agriPctEst(v,p20,p50,p80){
   if(p80!=null && v<=p80) return 0.5+(v-p50)/((p80-p50)||1)*0.3;
   return 0.9;
 }
+// 低估卡片的补充行：低估程度（较中位数）+ 历史分位；历史最低值特别标注
+function agriLowHtml(p,pct,histLow){
+  const L=p.latest, parts=[];
+  if(p.p50) parts.push('较中位数 '+((L.value/p.p50-1)*100).toFixed(1)+'%');
+  if(pct!=null) parts.push('历史分位 '+(p.pct!=null? pct*100 : pct*100).toFixed(p.pct!=null?1:0)+'%'+(p.pct!=null&&p.pct_years?'（近'+p.pct_years+'年）':'（估）'));
+  let h='<div style="font-size:12px;margin-top:4px;color:#0f6e56;font-weight:600">'+parts.join('　')+'</div>';
+  if(histLow) h+='<div style="font-size:12px;margin-top:3px;color:#b3261e;font-weight:700">★ 创历史最低'+(p.hist_min_prev!=null?'（前低 '+Number(p.hist_min_prev).toLocaleString()+(p.hist_min_prev_date?'，'+esc(p.hist_min_prev_date):'')+'）':'')+'</div>';
+  else if(p.hist_min!=null) h+='<div style="font-size:11.5px;margin-top:3px;color:#999">历史最低 '+Number(p.hist_min).toLocaleString()+(p.hist_min_date?'（'+esc(p.hist_min_date)+'）':'')+'</div>';
+  return h;
+}
 function renderAgri(){
   const pane=document.getElementById("pane");
   const ps=(agriOv.products||[]);
   let html='<div class="grid">';
   ps.forEach(p=>{
     const L=p.latest;
-    const _pct=agriPctEst(L?L.value:null, p.p20, p.p50, p.p80);
+    const _pct=(p.pct!=null)? p.pct : agriPctEst(L?L.value:null, p.p20, p.p50, p.p80);   // 优先用导出的真实分位
     const _low=(_pct!=null && _pct<0.3);
+    const _histLow=!!p.is_hist_low;
     html+='<div class="card agri-card'+(p.id===agriOpen?' on':'')+'" data-pid="'+p.id+'" style="cursor:pointer;position:relative">'+
-      (_low?'<span style="position:absolute;top:10px;right:12px;background:#e1f0e9;color:#0f6e56;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px">低估</span>':'')+
+      (_histLow?'<span style="position:absolute;top:10px;right:12px;background:#fdecea;color:#b3261e;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid #f1b8b3">★ 历史最低</span>'
+        : (_low?'<span style="position:absolute;top:10px;right:12px;background:#e1f0e9;color:#0f6e56;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px">低估</span>':''))+
       '<div class="nm">'+p.name+'</div>'+
       (L? '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+p.unit+'</span></div>'+
-          '<div class="chg '+agriChgCls(p.change)+'">'+agriChgTxt(p.change)+'</div>'
+          '<div class="chg '+agriChgCls(p.change)+'">'+agriChgTxt(p.change)+'</div>'+
+          (_low? agriLowHtml(p,_pct,_histLow) : '')
         : '<div class="val" style="color:var(--muted)">暂无</div>')+
       '</div>';
     if(p.id===agriOpen){
@@ -937,6 +963,30 @@ function etfDelta(first,last,dp,unit){   // 返回 "+7.95亿 (+3.22%)" 的 HTML
   const d=last-first, p=first? d/first*100 : null, cls=d>0?"up":(d<0?"down":"flat");
   return '<span class="'+cls+'">'+(d>0?"+":"")+etfFmt(d,dp)+unit+(p==null?"":' ('+(p>0?"+":"")+p.toFixed(2)+'%)')+'</span>';
 }
+// 预估买入金额（亿元）：窗口内每个交易日 Δ份额(亿份) × 当日收盘价(元)，再求和。ETF 价格≈净值，所以是估算值
+function etfAmt(g,code,n,datesIdx){
+  const px=g.prices&&g.prices[code]; if(!px) return null;
+  const sh=g.shares[code]; const idx=datesIdx||g.dates.map((_,i)=>i).filter(i=>sh[i]!=null);
+  if(idx.length<2) return null;
+  const use=idx.slice(-(n+1)); if(use.length<n+1) return null;     // 与"近n日变化"一致：需要 n+1 个点
+  let tot=0;
+  for(let k=1;k<use.length;k++){
+    const a=sh[use[k-1]], b=sh[use[k]], c=px[use[k]];
+    if(a==null||b==null||c==null) return null;
+    tot+=(b-a)*c;
+  }
+  return tot;
+}
+function etfAmtHtml(v){
+  if(v==null) return '';
+  const cls=v>0?"up":(v<0?"down":"flat");
+  return '<div class="chg" style="margin-top:2px">预估买入 <span class="'+cls+'">'+(v>0?"+":"")+etfFmt(v,2)+' 亿元</span></div>';
+}
+function etfTotAmt(g,fullIdx,n){            // 合计：各只基金在"全员有值"的日期上求和
+  let tot=0;
+  for(const f of g.funds){ const v=etfAmt(g,f.code,n,fullIdx); if(v==null) return null; tot+=v; }
+  return tot;
+}
 function etfDispose(){ erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[]; }
 function etfAxisX(dates){ return {type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}}; }
 
@@ -960,17 +1010,19 @@ function renderEtfGroup(pane, gk){
   const dchg=allT.map((x,i)=>i? +(x.v-allT[i-1].v).toFixed(4) : null).slice(allT.length-tView.length);
 
   let h='<div class="etf-head"><span class="t">'+esc(g.name)+'</span><span class="chip">'+g.funds.length+' 只 · '+dates.length+' 个交易日</span>'+
-    (etfMeta&&etfMeta.etf_latest?'<span class="upd">数据至 '+esc(etfMeta.etf_latest)+'（单位：亿份）</span>':'')+'</div>'+etfRangeBar();
+    (etfMeta&&etfMeta.etf_latest?'<span class="upd">数据至 '+esc(etfMeta.etf_latest)+'（单位：亿份；预估买入金额＝Δ份额×当日收盘价）</span>':'')+'</div>'+etfRangeBar();
   { const [b,l]=etfWinPair(tAll,etfWin);
     h+='<div class="grid etf-cards" style="margin-top:10px">';
     h+='<div class="card etf-card tot"><div class="nm">合计 · '+g.funds.length+' 只</div><div class="val">'+etfFmt(l,2)+' <span class="u">亿份</span></div>'+
-       '<div class="chg">'+winLab+' '+etfDelta(b,l,2,"亿")+'</div></div>'; }
+       '<div class="chg">'+winLab+' '+etfDelta(b,l,2,"亿")+'</div>'+
+       etfAmtHtml(etfTotAmt(g,allFull,etfWin))+'</div>'; }
   series.forEach((x,i)=>{
     const sel=(etfSel===x.f.code), [wb,wl]=etfWinPair(g.shares[x.f.code],etfWin);
     h+='<div class="card etf-card'+(sel?' sel':'')+'" data-c="'+esc(x.f.code)+'" style="border-left:4px solid '+ETF_COLORS[i%ETF_COLORS.length]+'">'+
       '<div class="nm">'+esc(x.f.name)+' · '+esc(x.f.code.slice(0,6))+'</div>'+
       '<div class="val">'+etfFmt(wl,2)+' <span class="u">亿份</span></div>'+
-      '<div class="chg">'+winLab+' '+etfDelta(wb,wl,2,"亿")+'</div></div>';
+      '<div class="chg">'+winLab+' '+etfDelta(wb,wl,2,"亿")+'</div>'+
+      etfAmtHtml(etfAmt(g,x.f.code,etfWin))+'</div>';
   });
   h+='</div>';
   h+='<div class="erp-chart-title" style="margin-top:18px">总份额变化曲线</div><div class="erp-chart-sub">份额增加（涨）<span class="up">●</span>　份额减少（跌）<span class="down">●</span>　点击上方卡片可高亮某只</div><div class="erp-chart" id="etfc1"></div>';

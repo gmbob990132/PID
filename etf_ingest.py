@@ -108,6 +108,8 @@ def init_db(conn):
       code TEXT PRIMARY KEY, name TEXT, grp TEXT NOT NULL, sort INTEGER DEFAULT 0);
     CREATE TABLE IF NOT EXISTS etf_share(
       code TEXT NOT NULL, date TEXT NOT NULL, share REAL NOT NULL, PRIMARY KEY(code, date));
+    CREATE TABLE IF NOT EXISTS etf_price(
+      code TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, PRIMARY KEY(code, date));
     CREATE TABLE IF NOT EXISTS margin(
       date TEXT NOT NULL, exch TEXT NOT NULL,
       rzye REAL, rzmre REAL, rzche REAL, rqye REAL, rqmcl REAL, rzrqye REAL, rqyl REAL,
@@ -256,6 +258,22 @@ def run(db_path, pro, offline=False):
                     n_fail += 1
                     log(conn, f"share:{c}", "failed", 0, str(ex))
                     print(f"  ⚠ {c} 份额取数失败：{str(ex)[:120]}")
+                # 收盘价（用于"预估买入金额"= Δ份额 × 收盘价；新基金/首次回填 3 年）
+                lastp = last_date(conn, "SELECT MAX(date) FROM etf_price WHERE code=?", (c,))
+                startp = (datetime.strptime(lastp, "%Y-%m-%d").date() - timedelta(days=OVERLAP_DAYS)) if lastp \
+                    else today - timedelta(days=BACKFILL_DAYS)
+                try:
+                    dp = ts_call(pro.fund_daily, ts_code=c, start_date=_ymd(startp), end_date=_ymd(today))
+                    n = 0
+                    for d, px in dp[["trade_date", "close"]].values.tolist():
+                        if _f(px) is not None:
+                            conn.execute("INSERT INTO etf_price(code,date,close) VALUES(?,?,?) "
+                                         "ON CONFLICT(code,date) DO UPDATE SET close=excluded.close", (c, _iso(d), float(px)))
+                            n += 1
+                    log(conn, f"price:{c}", "ok", n, f"from {startp}")
+                except Exception as ex:  # noqa: BLE001
+                    log(conn, f"price:{c}", "failed", 0, str(ex))
+                    print(f"  ⚠ {c} 收盘价取数失败（不影响份额）：{str(ex)[:100]}")
 
         # 融资融券
         last = last_date(conn, "SELECT MAX(date) FROM margin")
@@ -357,12 +375,13 @@ def selftest():
     assert kc == {"588080.SH", "588000.SH"}, kc                                      # 科创创业50、芯片 被排除
     cyb = {r[0] for r in conn.execute("SELECT code FROM etf_funds WHERE grp='cyb'")}
     assert cyb == {"159915.SZ", "159952.SZ"}, cyb                                    # 创业板50、成长 被排除
+    assert q("SELECT COUNT(*) FROM etf_price") > 500
     n1 = q("SELECT COUNT(*) FROM etf_share"); m1 = q("SELECT COUNT(*) FROM margin")
     assert n1 > 500 and m1 > 100
     conn.close()
     assert run(db, pro) == 0                                                       # 第二次：增量，不重复
     conn = sqlite3.connect(db)
-    assert q("SELECT COUNT(*) FROM etf_share") == n1 and q("SELECT COUNT(*) FROM margin") == m1
+    assert q("SELECT COUNT(*) FROM etf_share") == n1 and q("SELECT COUNT(*) FROM etf_price") > 500 and q("SELECT COUNT(*) FROM margin") == m1
     cfg = json.load(open(CFG_PATH, encoding="utf-8"))
     assert len(cfg["csi500"]) == 6 and cfg["hs300"] == HS300 and len(cfg["sse50"]) == 4 and len(cfg["kc50"]) == 2 and len(cfg["cyb"]) == 2
     print("selftest OK")

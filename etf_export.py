@@ -27,6 +27,7 @@ def _write(path, obj):
 def export(db_path, out_dir):
     conn = sqlite3.connect(db_path)
     gen = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    conn.execute("CREATE TABLE IF NOT EXISTS etf_price(code TEXT NOT NULL, date TEXT NOT NULL, close REAL NOT NULL, PRIMARY KEY(code, date))")
 
     groups = {}
     for g, gname in GROUP_NAMES.items():
@@ -40,7 +41,15 @@ def export(db_path, out_dir):
             for d, s in conn.execute("SELECT date,share FROM etf_share WHERE code=?", (code,)):
                 arr[idx[d]] = round(s / 1e4, 4)               # 万份 → 亿份
             shares[code] = arr
-        groups[g] = {"name": gname, "funds": [{"code": c, "name": n} for c, n in funds], "dates": dates, "shares": shares}
+        prices = {}                                            # 收盘价（元），与 dates 对齐；用于前端算"预估买入金额"
+        for code, _ in funds:
+            arr = [None] * len(dates)
+            for d, px in conn.execute("SELECT date,close FROM etf_price WHERE code=?", (code,)):
+                if d in idx:
+                    arr[idx[d]] = round(px, 4)
+            prices[code] = arr
+        groups[g] = {"name": gname, "funds": [{"code": c, "name": n} for c, n in funds], "dates": dates,
+                     "shares": shares, "prices": prices}
     _write(os.path.join(out_dir, "etf.json"), {"generated_at": gen, "unit": "亿份", "groups": groups})
 
     # 融资融券：全市场 = 沪+深+北
