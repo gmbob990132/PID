@@ -1,0 +1,35 @@
+name: publish-public
+# 把"不含技术指标分析"的公开版站点发布到本仓库的 public 分支（每次覆盖成单个提交，仓库不会变大）。
+# 触发：index.html 改动 / 各数据工作流跑完 / 每 30 分钟兜底 / 手动
+on:
+  push:
+    branches: [main]
+    paths: ['index.html', 'build_public.sh', '.github/workflows/publish-public.yml']
+  workflow_run:
+    workflows: [lv-update, valuation-daily, erp-daily, metals-daily, agri-daily, coal-daily, etf-daily]
+    types: [completed]
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: publish-public
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: bash build_public.sh
+      - name: 推送到 public 分支
+        run: |
+          cd dist
+          git init -q -b public
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -q -m "public site $(TZ=Asia/Shanghai date '+%F %H:%M')"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" public
