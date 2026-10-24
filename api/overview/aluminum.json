@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-24T06:09:26+00:00",
+  "module": "aluminum",
+  "today": "2026-10-24",
+  "metrics": [
+    {
+      "id": "al_spot_east",
+      "name": "现货·华东",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 23670.0,
+        "mom": -40.0,
+        "yoy": null,
+        "src_change": -40.0,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 6
+      }
+    },
+    {
+      "id": "al_spot_south",
+      "name": "现货·华南",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 23600.0,
+        "mom": -20.0,
+        "yoy": null,
+        "src_change": -20.0,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 6
+      }
+    },
+    {
+      "id": "al_spot_central",
+      "name": "现货·中原",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 23520.0,
+        "mom": -60.0,
+        "yoy": null,
+        "src_change": -60.0,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 6
+      }
+    },
+    {
+      "id": "al_social_inv",
+      "name": "社会库存",
+      "category": "inventory",
+      "unit": "万吨",
+      "source_type": "api",
+      "update_freq": "biweekly",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-22",
+        "value": 53.1,
+        "mom": -3.5,
+        "yoy": null,
+        "src_change": -3.5,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 2
+      }
+    },
+    {
+      "id": "al_futures_main",
+      "name": "沪铝主力",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 23350.0,
+        "mom": 175.0,
+        "yoy": 2185.0,
+        "src_change": null,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 261
+      }
+    },
+    {
+      "id": "al_alumina_futures",
+      "name": "氧化铝主力",
+      "category": "cost",
+      "unit": "元/吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 2576.0,
+        "mom": 10.0,
+        "yoy": -262.0,
+        "src_change": null,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 261
+      }
+    },
+    {
+      "id": "al_lme_price",
+      "name": "LME铝价",
+      "category": "price",
+      "unit": "美元/吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": true,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 3040.5,
+        "mom": 35.0,
+        "yoy": 176.5,
+        "src_change": null,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 2538
+      }
+    },
+    {
+      "id": "al_lme_inv",
+      "name": "LME库存",
+      "category": "inventory",
+      "unit": "万吨",
+      "source_type": "free",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 23.58,
+        "mom": -0.020000000000003126,
+        "yoy": -24.190000000000005,
+        "src_change": null,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 206
+      }
+    },
+    {
+      "id": "al_alumina_spot",
+      "name": "氧化铝现货",
+      "category": "cost",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 2680.0,
+        "mom": 0.0,
+        "yoy": null,
+        "src_change": 0.0,
+        "region": "山西"
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 1
+      }
+    },
+    {
+      "id": "al_ingot_a00",
+      "name": "A00铝锭",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "daily",
+      "hide_overview": false,
+      "hide_chart": false,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 23660.0,
+        "mom": -40.0,
+        "yoy": null,
+        "src_change": -40.0,
+        "region": "无锡"
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 1
+      }
+    },
+    {
+      "id": "al_anode",
+      "name": "预焙阳极",
+      "category": "cost",
+      "unit": "元/吨",
+      "source_type": "api",
+      "update_freq": "weekly",
+      "hide_overview": false,
+      "hide_chart": true,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 6280.0,
+        "mom": 0.0,
+        "yoy": null,
+        "src_change": 0.0,
+        "region": "山东"
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 1
+      }
+    },
+    {
+      "id": "al_spot_premium",
+      "name": "现货升贴水",
+      "category": "price",
+      "unit": "元/吨",
+      "source_type": "derived",
+      "update_freq": "daily",
+      "hide_overview": true,
+      "hide_chart": true,
+      "latest": {
+        "date": "2026-10-23",
+        "value": 320.0,
+        "mom": -215.0,
+        "yoy": null,
+        "src_change": null,
+        "region": null
+      },
+      "updated_today": false,
+      "last_ingest": {
+        "run_at": "2026-10-24T06:07:12+00:00",
+        "status": "ok",
+        "rows_written": 46
+      }
+    }
+  ]
+}

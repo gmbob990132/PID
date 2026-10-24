@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-24T06:09:26+00:00",
+  "metric": {
+    "id": "al_lme_inv",
+    "name": "LME库存",
+    "category": "inventory",
+    "unit": "万吨"
+  },
+  "range": "recent",
+  "points": [
+    {
+      "date": "2026-09-11",
+      "value": 24.41,
+      "change": -0.019999999999999574,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-14",
+      "value": 24.39,
+      "change": -0.019999999999999574,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-15",
+      "value": 24.36,
+      "change": -0.030000000000001137,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-16",
+      "value": 24.36,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-17",
+      "value": 24.26,
+      "change": -0.09999999999999787,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-18",
+      "value": 24.26,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-21",
+      "value": 24.22,
+      "change": -0.0400000000000027,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-22",
+      "value": 24.21,
+      "change": -0.00999999999999801,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-23",
+      "value": 24.14,
+      "change": -0.07000000000000028,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-24",
+      "value": 24.14,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-25",
+      "value": 24.14,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-28",
+      "value": 24.14,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-29",
+      "value": 24.14,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-30",
+      "value": 24.14,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-01",
+      "value": 24.06,
+      "change": -0.08000000000000185,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-02",
+      "value": 24.04,
+      "change": -0.019999999999999574,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-05",
+      "value": 24.04,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-06",
+      "value": 23.89,
+      "change": -0.14999999999999858,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-07",
+      "value": 23.89,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-08",
+      "value": 23.89,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-09",
+      "value": 23.89,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-12",
+      "value": 23.86,
+      "change": -0.030000000000001137,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-13",
+      "value": 23.86,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-14",
+      "value": 23.84,
+      "change": -0.019999999999999574,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-15",
+      "value": 23.81,
+      "change": -0.030000000000001137,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-16",
+      "value": 23.79,
+      "change": -0.019999999999999574,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-19",
+      "value": 23.64,
+      "change": -0.14999999999999858,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-20",
+      "value": 23.62,
+      "change": -0.019999999999999574,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-21",
+      "value": 23.61,
+      "change": -0.010000000000001563,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-22",
+      "value": 23.6,
+      "change": -0.00999999999999801,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-23",
+      "value": 23.58,
+      "change": -0.020000000000003126,
+      "src_change": null
+    }
+  ]
+}

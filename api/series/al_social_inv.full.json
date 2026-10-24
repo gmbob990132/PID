@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-24T06:09:26+00:00",
+  "metric": {
+    "id": "al_social_inv",
+    "name": "社会库存",
+    "category": "inventory",
+    "unit": "万吨"
+  },
+  "range": "full",
+  "points": [
+    {
+      "date": "2026-08-17",
+      "value": 86.3,
+      "change": null,
+      "src_change": -1.3
+    },
+    {
+      "date": "2026-08-20",
+      "value": 84.9,
+      "change": -1.3999999999999915,
+      "src_change": -1.4
+    },
+    {
+      "date": "2026-08-24",
+      "value": 83.5,
+      "change": -1.4000000000000057,
+      "src_change": -1.4
+    },
+    {
+      "date": "2026-08-27",
+      "value": 82.1,
+      "change": -1.4000000000000057,
+      "src_change": -1.4
+    },
+    {
+      "date": "2026-08-31",
+      "value": 80.9,
+      "change": -1.1999999999999886,
+      "src_change": -1.2
+    },
+    {
+      "date": "2026-09-03",
+      "value": 78.9,
+      "change": -2.0,
+      "src_change": -2.0
+    },
+    {
+      "date": "2026-09-07",
+      "value": 77.4,
+      "change": -1.5,
+      "src_change": -1.5
+    },
+    {
+      "date": "2026-09-10",
+      "value": 76.8,
+      "change": -0.6000000000000085,
+      "src_change": -0.6
+    },
+    {
+      "date": "2026-09-14",
+      "value": 74.9,
+      "change": -1.8999999999999915,
+      "src_change": -1.9
+    },
+    {
+      "date": "2026-09-17",
+      "value": 70.5,
+      "change": -4.400000000000006,
+      "src_change": -4.4
+    },
+    {
+      "date": "2026-09-21",
+      "value": 69.8,
+      "change": -0.7000000000000028,
+      "src_change": -0.7
+    },
+    {
+      "date": "2026-09-24",
+      "value": 65.1,
+      "change": -4.700000000000003,
+      "src_change": -4.7
+    },
+    {
+      "date": "2026-09-28",
+      "value": 64.2,
+      "change": -0.8999999999999915,
+      "src_change": -0.9
+    },
+    {
+      "date": "2026-10-08",
+      "value": 64.6,
+      "change": 0.3999999999999915,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-12",
+      "value": 61.6,
+      "change": -2.999999999999993,
+      "src_change": -3.0
+    },
+    {
+      "date": "2026-10-15",
+      "value": 58.6,
+      "change": -3.0,
+      "src_change": -3.0
+    },
+    {
+      "date": "2026-10-19",
+      "value": 56.6,
+      "change": -2.0,
+      "src_change": -2.0
+    },
+    {
+      "date": "2026-10-22",
+      "value": 53.1,
+      "change": -3.5,
+      "src_change": -3.5
+    }
+  ]
+}
