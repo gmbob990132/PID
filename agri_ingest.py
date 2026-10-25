@@ -32,7 +32,9 @@ PRODUCTS = [
     ("starch",  "玉米淀粉", "CS0", "元/吨"),
     ("soymeal", "豆粕",   "M0",  "元/吨"),
     ("egg",     "鸡蛋",   "JD0", "元/吨"),
-    ("hog",     "生猪",   "LH0", "元/吨"),
+    ("hog",     "生猪（期货）", "LH0", "元/吨"),
+    # 现货：玄田数据（zhujia.zhuwang.com.cn）全国外三元生猪出栏均价，日度，元/公斤；接口只给近1年，靠每天入库累积
+    ("hog_spot", "生猪出栏价（外三元）", "SPOT:hog_core:外三元", "元/公斤"),
 ]
 
 
@@ -66,17 +68,39 @@ def latest_date(conn, mid):
     return r[0] if r and r[0] else None
 
 
-def upsert(conn, mid, d, v, now_utc):
+def upsert(conn, mid, d, v, now_utc, source="akshare/futures_main_sina"):
     if v is None:
         return 0
     conn.execute("INSERT INTO observations(metric_id,obs_date,value,source,ingested_at) "
                  "VALUES(?,?,?,?,?) ON CONFLICT(metric_id,obs_date) DO UPDATE SET "
-                 "value=excluded.value, ingested_at=excluded.ingested_at",
-                 (mid, d, v, "akshare/futures_main_sina", now_utc))
+                 "value=excluded.value, ingested_at=excluded.ingested_at, source=excluded.source",
+                 (mid, d, v, source, now_utc))
     return 1
 
 
+def parse_spot_df(df, start_d, today):
+    """玄田数据返回 date/value 两列：转成 [(YYYY-MM-DD, float)]，丢掉缺失值、起始日之前、以及晚于今天的日期。"""
+    out = []
+    for d, v in df[["date", "value"]].values.tolist():
+        try:
+            v = float(v)
+            dd = str(d)[:10]
+            if v != v or v <= 0:
+                continue
+            if dd < start_d.isoformat() or dd > today.isoformat():
+                continue
+            out.append((dd, v))
+        except (TypeError, ValueError):
+            continue
+    return sorted(out)
+
+
 def fetch(code, start_d):
+    if code.startswith("SPOT:"):
+        import akshare as ak
+        _, fn, arg = code.split(":", 2)
+        df = getattr(ak, "futures_" + fn)(symbol=arg)
+        return parse_spot_df(df, start_d, datetime.now(CN_TZ).date())
     import akshare as ak
     df = ak.futures_main_sina(symbol=code, start_date=start_d.strftime("%Y%m%d"), end_date="22220101")
     ccol = "收盘价" if "收盘价" in df.columns else next(c for c in df.columns if "close" in str(c).lower())
@@ -107,8 +131,9 @@ def run(db_path):
             try:
                 rows = [] if _SELFTEST else fetch(code, start_d)
                 n = 0
+                src = "akshare/futures_hog_core(玄田)" if code.startswith("SPOT:") else "akshare/futures_main_sina"
                 for d, v in rows:
-                    n += upsert(conn, pid, d, v, now_utc)
+                    n += upsert(conn, pid, d, v, now_utc, src)
                 conn.execute("INSERT INTO ingest_runs(metric_id,run_at,status,rows_written,message) "
                              "VALUES(?,?,?,?,?)", (pid, now_utc, "ok" if n else "no_data", n, f"from {start_d}"))
             except Exception as ex:
@@ -125,7 +150,7 @@ def run(db_path):
                              "ORDER BY obs_date DESC LIMIT 1", (pid,)).fetchone()
             tot = conn.execute("SELECT COUNT(*) FROM observations WHERE metric_id=?", (pid,)).fetchone()[0]
             if r:
-                print(f"  ✓ {nm:<6} {r[1]:>9.1f} {unit}  最新 {r[0]}  （共{tot}天）")
+                print(f"  ✓ {nm:<6} {r[1]:>9.2f} {unit}  最新 {r[0]}  （共{tot}天）")
             else:
                 print(f"  · {nm:<6} 无数据")
         return 0 if all_ok else 2
@@ -140,6 +165,10 @@ def main():
         db = os.path.join(HERE, "data", "agri_selftest.db")
         if os.path.exists(db):
             os.remove(db)
+        import pandas as pd
+        t = parse_spot_df(pd.DataFrame({"date": [date(2026, 1, 1), date(2026, 1, 2), date(2099, 1, 1), date(2026, 1, 3)],
+                                        "value": [9.5, float("nan"), 9.9, 9.6]}), date(2026, 1, 2), date(2026, 6, 1))
+        assert t == [("2026-01-03", 9.6)], t                # 缺失值、起始日前、未来日期都被丢掉
         print("[自测] 仅验证建表/流程（akshare 离线不取数）\n")
         sys.exit(run(db))
     print(f"[{datetime.now(CN_TZ):%Y-%m-%d %H:%M} CST] 开始 …")

@@ -66,7 +66,8 @@ def export(db_path, out_dir):
         p20 = _percentile(vals, .2); p50 = _percentile(vals, .5); p80 = _percentile(vals, .8)
         latest = pts[-1] if pts else None
         prev = pts[-2] if len(pts) >= 2 else None
-        change = round(latest["value"] - prev["value"], 1) if (latest and prev) else None
+        dp = 2 if m["unit"] == "元/公斤" else 1                   # 公斤口径的价格只有个位数，涨跌保留 2 位
+        change = round(latest["value"] - prev["value"], dp) if (latest and prev) else None
         # 历史分位（近10年内，<=最新值的占比）+ 历史最低标记（与全部历史比）
         pct = pct_years = None
         if latest and len(vals) >= 30:
@@ -77,7 +78,7 @@ def export(db_path, out_dir):
         is_hist_low = False
         if pts:
             mn = min(pts, key=lambda x: x["value"]); hist_min, hist_min_date = mn["value"], mn["date"]
-            if len(pts) >= 250:                                   # 历史太短时不标"历史最低"
+            if len(pts) >= 730:                                   # 不足 2 年的历史，不标"历史最低"（避免只有 1 年数据也喊历史最低）
                 prev = min(pts[:-1], key=lambda x: x["value"])
                 prev_min, prev_min_date = prev["value"], prev["date"]
                 is_hist_low = latest["value"] <= prev_min
@@ -87,7 +88,16 @@ def export(db_path, out_dir):
                       "pct": pct, "pct_years": pct_years,
                       "hist_min": hist_min, "hist_min_date": hist_min_date,
                       "hist_min_prev": prev_min, "hist_min_prev_date": prev_min_date,
-                      "is_hist_low": is_hist_low})
+                      "is_hist_low": is_hist_low,
+                      "hist_years": round((datetime.strptime(pts[-1]["date"], "%Y-%m-%d") - datetime.strptime(pts[0]["date"], "%Y-%m-%d")).days / 365, 1) if pts else None})
+
+    # 期现基差：生猪期货主力(元/吨→元/公斤) − 出栏价(外三元)，取期货最新交易日当天的现货价
+    by = {c["id"]: c for c in cards}
+    if "hog" in by and "hog_spot" in by and by["hog"]["latest"]:
+        fd, fv = by["hog"]["latest"]["date"], by["hog"]["latest"]["value"]
+        r = conn.execute("SELECT value FROM observations WHERE metric_id='hog_spot' AND obs_date=?", (fd,)).fetchone()
+        if r:
+            by["hog_spot"]["basis"] = {"date": fd, "value": round(fv / 1000.0 - r["value"], 2)}
 
     _write(os.path.join(out_dir, "overview.json"),
            {"schema_version": SCHEMA_VERSION, "generated_at": gen, "module": "agri",

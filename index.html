@@ -830,7 +830,8 @@ function agriLowHtml(p,pct,histLow){
   if(histLow) h+='<div style="font-size:12px;margin-top:3px;color:#b3261e;font-weight:700">★ 创历史最低'+(p.hist_min_prev!=null?'（前低 '+Number(p.hist_min_prev).toLocaleString()+(p.hist_min_prev_date?'，'+esc(p.hist_min_prev_date):'')+'）':'')+'</div>';
   else if(p.hist_min!=null){
     const gap=p.hist_min? (L.value/p.hist_min-1)*100 : null;
-    h+='<div style="font-size:11.5px;margin-top:3px;color:'+(gap!=null&&gap<=3?'#b3261e':'#999')+'">'+(gap!=null&&gap<=3?'接近历史最低：':'历史最低 ')+Number(p.hist_min).toLocaleString()+(p.hist_min_date?'（'+esc(p.hist_min_date)+'）':'')+(gap!=null?'，现价高 '+gap.toFixed(1)+'%':'')+'</div>';
+    const hl=(p.hist_years!=null&&p.hist_years<3)? '近'+Math.max(1,Math.round(p.hist_years))+'年最低' : '历史最低';   // 数据不足3年时不叫"历史"
+    h+='<div style="font-size:11.5px;margin-top:3px;color:'+(gap!=null&&gap<=3?'#b3261e':'#999')+'">'+(gap!=null&&gap<=3?'处于'+hl+'附近：':hl+' ')+Number(p.hist_min).toLocaleString()+(p.hist_min_date?'（'+esc(p.hist_min_date)+'）':'')+(gap!=null?'，现价高 '+gap.toFixed(1)+'%':'')+'</div>';
   }
   return h;
 }
@@ -849,6 +850,7 @@ function renderAgri(){
       '<div class="nm">'+p.name+'</div>'+
       (L? '<div><span class="val">'+L.value.toLocaleString()+'</span> <span class="u">'+p.unit+'</span></div>'+
           '<div class="chg '+agriChgCls(p.change)+'">'+agriChgTxt(p.change)+'</div>'+
+          (p.basis? '<div style="font-size:12px;margin-top:4px;color:#777">期现基差（期货−现货） <b style="color:'+(p.basis.value>0?'var(--up)':(p.basis.value<0?'var(--down)':'#777'))+'">'+(p.basis.value>0?'+':'')+p.basis.value.toFixed(2)+'</b> 元/公斤</div>' : '')+
           (_low? agriLowHtml(p,_pct,_histLow) : '')
         : '<div class="val" style="color:var(--muted)">暂无</div>')+
       '</div>';
