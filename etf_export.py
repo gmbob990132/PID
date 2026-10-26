@@ -65,7 +65,19 @@ def export(db_path, out_dir):
             if r[1] in ("SSE", "SZSE"):
                 series[r[1]][f][i] = round(v, 2)
             series["all"][f][i] = round((series["all"][f][i] or 0) + v, 2)
-    _write(os.path.join(out_dir, "margin.json"), {"generated_at": gen, "unit": "亿元", "dates": dates, "series": series})
+    # 沪、深有一边还没披露的日子，"全市场"只剩半边，会把合计和变化算歪（曾出现两融余额一天"腰斩"）：该日全市场置空
+    for f in MARGIN_FIELDS:
+        for i in range(len(dates)):
+            if series["SSE"][f][i] is None or series["SZSE"][f][i] is None:
+                series["all"][f][i] = None
+    # 平均维持担保比例（市场整体）：单位 %。若源数据是小数（如 2.8）则 ×100
+    conn.execute("CREATE TABLE IF NOT EXISTS margin_account(date TEXT PRIMARY KEY, avg_ratio REAL, guarantee REAL)")
+    acc = conn.execute("SELECT date,avg_ratio,guarantee FROM margin_account ORDER BY date").fetchall()
+    scale = 100.0 if acc and sorted(a[1] for a in acc)[len(acc) // 2] < 10 else 1.0
+    account = {"dates": [a[0] for a in acc], "ratio": [round(a[1] * scale, 2) for a in acc],
+               "guarantee": [None if a[2] is None else round(a[2] / 1e8, 1) for a in acc]}     # 担保物总价值：亿元
+    _write(os.path.join(out_dir, "margin.json"), {"generated_at": gen, "unit": "亿元", "dates": dates, "series": series,
+                                                  "account": account})
 
     runs = conn.execute("SELECT run_at,item,status,message FROM run_log ORDER BY id DESC LIMIT 40").fetchall()
     last_run = runs[0][0] if runs else None

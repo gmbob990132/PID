@@ -1075,7 +1075,14 @@ function renderMarginPane(pane){
     const [b,l]=etfWinPair(arr,etfWin);
     const sub=isFlow? '<span class="flat">'+winLab+'累计 '+etfFmt(etfWinSum(arr,etfWin),1)+' 亿</span>' : winLab+' '+etfDelta(b,l,1,"亿");
     return '<div class="card etf-card"><div class="nm">'+nm+(isFlow?'（最新一日）':'')+'</div><div class="val">'+etfBigYi(l)+'</div><div class="chg">'+sub+'</div></div>'; };
-  h+='<div class="grid etf-cards" style="margin-top:10px">'+card("两融余额",S.rzrqye)+card("融资余额",S.rzye)+card("融券余额",S.rqye)+card("融资买入额",S.rzmre,true)+'</div>';
+  const A=M.account||{dates:[],ratio:[],guarantee:[]};
+  const accCard=(()=>{                         // 平均维持担保比例：市场整体口径，不随沪/深切换
+    if(!A.dates.length) return '';
+    const [b,l]=etfWinPair(A.ratio,etfWin);
+    return '<div class="card etf-card"><div class="nm">平均维持担保比例（全市场）</div><div class="val">'+etfFmt(l,2)+' <span class="u">%</span></div>'+
+      '<div class="chg">'+winLab+' '+etfDelta(b,l,2,"个百分点")+'</div></div>'; })();
+  h+='<div class="grid etf-cards" style="margin-top:10px">'+card("两融余额",S.rzrqye)+card("融资余额",S.rzye)+card("融券余额",S.rqye)+card("融资买入额",S.rzmre,true)+accCard+'</div>';
+  if(A.dates.length) h+='<div class="erp-chart-title" style="margin-top:18px">平均维持担保比例</div><div class="erp-chart-sub">全市场所有两融账户的平均值（%），不是单个账户；虚线 130% 为交易所规定的追加担保物参考线。比例越低，说明市场整体杠杆越紧。来源：东方财富数据中心（两融账户统计）</div><div class="erp-chart" id="mxc0"></div>';
   h+='<div class="erp-chart-title" style="margin-top:18px">两融余额 / 融资余额</div><div class="erp-chart-sub">单位：万亿元</div><div class="erp-chart" id="mxc1"></div>';
   h+='<div class="erp-chart-title" style="margin-top:18px">融资买入额 与 融资净买入</div><div class="erp-chart-sub">线：每日融资买入额；柱：融资净买入（买入 − 偿还），正为红、负为绿（亿元）</div><div class="erp-chart" id="mxc2"></div>';
   h+='<div class="erp-chart-title" style="margin-top:18px">融券余额</div><div class="erp-chart-sub">单位：亿元</div><div class="erp-chart" id="mxc3"></div>';
@@ -1084,6 +1091,15 @@ function renderMarginPane(pane){
   const mk=(id,opt)=>{ const c=echarts.init(document.getElementById(id)); c.setOption(opt); erpCharts.push(c); };
   const base={grid:{left:8,right:12,top:30,bottom:24,containLabel:true},tooltip:{trigger:"axis"},xAxis:etfAxisX(dates)};
   const wan=a=>a.map(v=>v==null?null:+(v/1e4).toFixed(4));
+  if(A.dates.length){
+    const ac=etfCutoff(A.dates), aix=[]; A.dates.forEach((d,i)=>{ if(d>=ac) aix.push(i); });
+    const ad=aix.map(i=>A.dates[i]), av=aix.map(i=>A.ratio[i]);
+    mk("mxc0",{grid:base.grid,xAxis:etfAxisX(ad),
+      tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(2)+" %"},
+      yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888",formatter:v=>v+"%"}},
+      series:[{name:"平均维持担保比例",type:"line",showSymbol:false,connectNulls:true,data:av,lineStyle:{width:2},itemStyle:{color:"#2a6fdb"},
+        markLine:{silent:true,symbol:"none",data:[{yAxis:130,lineStyle:{type:"dashed",color:"#d4533a",width:1},label:{formatter:"130%",color:"#d4533a",position:"end"}}]}}]});
+  }
   mk("mxc1",{...base,legend:{top:0,data:["两融余额","融资余额"],icon:"roundRect",itemWidth:14,itemHeight:3},
     tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(3)+" 万亿"},
     yAxis:{type:"value",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}},

@@ -114,6 +114,8 @@ def init_db(conn):
       date TEXT NOT NULL, exch TEXT NOT NULL,
       rzye REAL, rzmre REAL, rzche REAL, rqye REAL, rqmcl REAL, rzrqye REAL, rqyl REAL,
       PRIMARY KEY(date, exch));
+    CREATE TABLE IF NOT EXISTS margin_account(
+      date TEXT PRIMARY KEY, avg_ratio REAL, guarantee REAL);
     CREATE TABLE IF NOT EXISTS run_log(
       id INTEGER PRIMARY KEY AUTOINCREMENT, run_at TEXT, item TEXT, status TEXT, rows INTEGER, message TEXT);
     """)
@@ -212,6 +214,47 @@ def load_config(pro, basic):
     return out, names
 
 
+# ---------------- 两融账户统计：平均维持担保比例（东方财富数据中心，日度）----------------
+ACCOUNT_URL = ("https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPTA_WEB_MARGIN_DAILYTRADE"
+               "&columns=ALL&pageSize=500&sortColumns=STATISTICS_DATE&sortTypes=-1&pageNumber=")
+
+
+def fetch_account_info(since):
+    """返回 [(YYYY-MM-DD, 平均维持担保比例, 担保物总价值(元))]，只取 since（YYYY-MM-DD）之后。按日期倒序分页，翻到早于 since 就停。"""
+    from urllib.request import Request, urlopen
+    out, page, pages = [], 1, 1
+    while page <= pages:
+        last_err = None
+        for _ in range(3):
+            try:
+                req = Request(ACCOUNT_URL + str(page), headers={"User-Agent": "Mozilla/5.0"})
+                j = json.loads(urlopen(req, timeout=60).read().decode("utf-8"))
+                break
+            except Exception as ex:  # noqa: BLE001
+                last_err = ex; time.sleep(3)
+        else:
+            raise last_err
+        res = j.get("result") or {}
+        pages = int(res.get("pages") or 1)
+        rows = res.get("data") or []
+        oldest = "9999"
+        for r in rows:
+            d = str(r.get("STATISTICS_DATE", ""))[:10]
+            ratio = _f(r.get("AVG_GUARANTEE_RATIO"))
+            if not d or ratio is None:
+                continue
+            oldest = min(oldest, d)
+            if d >= since:
+                out.append((d, float(ratio), _f(r.get("TOTAL_GUARANTEE"))))
+        if not rows or oldest < since:
+            break
+        page += 1
+    return out
+
+
+ACCOUNT_FETCH = fetch_account_info          # 自检时替换成离线假数据
+
+
 # ---------------- 主流程 ----------------
 def last_date(conn, sql, args=()):
     r = conn.execute(sql, args).fetchone()
@@ -297,6 +340,24 @@ def run(db_path, pro, offline=False):
             log(conn, "margin", "failed", 0, str(ex))
             print(f"  ⚠ 融资融券取数失败：{str(ex)[:120]}")
 
+        # 平均维持担保比例（市场整体）
+        last = last_date(conn, "SELECT MAX(date) FROM margin_account")
+        start = (datetime.strptime(last, "%Y-%m-%d").date() - timedelta(days=OVERLAP_DAYS)) if last \
+            else today - timedelta(days=BACKFILL_DAYS)
+        try:
+            rows = ACCOUNT_FETCH(start.isoformat())
+            for d, ratio, gv in rows:
+                conn.execute("INSERT INTO margin_account(date,avg_ratio,guarantee) VALUES(?,?,?) "
+                             "ON CONFLICT(date) DO UPDATE SET avg_ratio=excluded.avg_ratio, guarantee=excluded.guarantee",
+                             (d, ratio, gv))
+            log(conn, "margin_account", "ok", len(rows), f"from {start}")
+            n_ok += 1
+            print(f"  平均维持担保比例  +{len(rows)} 行" + (f"，最新 {max(rows)[0]} = {max(rows)[1]}" if rows else ""))
+        except Exception as ex:  # noqa: BLE001
+            n_fail += 1
+            log(conn, "margin_account", "failed", 0, str(ex))
+            print(f"  ⚠ 平均维持担保比例取数失败（不影响其它）：{str(ex)[:120]}")
+
         conn.commit()
         for g in GROUPS:
             print(f"  [{GROUPS[g]}] 最新份额日期：",
@@ -362,6 +423,8 @@ def selftest():
     CFG_PATH = os.path.join(tmp, "etfs.json")
     db = os.path.join(tmp, "etf.db")
     pro = _FakePro()
+    global ACCOUNT_FETCH
+    ACCOUNT_FETCH = lambda since: [(d.isoformat(), 270.0 + i * 0.1, 2.0e13) for i, d in enumerate(pro.days) if d.isoformat() >= since]
     assert run(db, pro) == 0
     conn = sqlite3.connect(db)
     q = lambda s: conn.execute(s).fetchone()[0]
@@ -376,6 +439,7 @@ def selftest():
     cyb = {r[0] for r in conn.execute("SELECT code FROM etf_funds WHERE grp='cyb'")}
     assert cyb == {"159915.SZ", "159952.SZ"}, cyb                                    # 创业板50、成长 被排除
     assert q("SELECT COUNT(*) FROM etf_price") > 500
+    assert q("SELECT COUNT(*) FROM margin_account") > 50
     n1 = q("SELECT COUNT(*) FROM etf_share"); m1 = q("SELECT COUNT(*) FROM margin")
     assert n1 > 500 and m1 > 100
     conn.close()
