@@ -218,14 +218,14 @@ def load_config(pro, basic):
     return out, names
 
 
-# ---------------- 沪深300 流通市值（成分股 float_mv 求和，单位 万元）----------------
+# ---------------- 沪深300 流通市值（成分股 circ_mv 求和，单位 万元）----------------
 HS300_INDEX = "000300.SH"
 MV_MAX_PER_RUN = 450            # 每次最多补这么多个交易日的 daily_basic（每天 1 次调用，防止首次回填超时；下次接着补）
 MV_MIN_MATCH = 0.9              # 当日成分股里至少 90% 在 daily_basic 里找到，否则该日不入库
 
 
 def update_hs300_mv(conn, pro, today):
-    """成分股快照：index_weight（月度）；流通市值：对每个交易日取 daily_basic 全市场 float_mv，按当时的成分股求和。"""
+    """成分股快照：index_weight（月度）；流通市值：对每个交易日取 daily_basic 全市场 circ_mv，按当时的成分股求和。"""
     start_d = today - timedelta(days=BACKFILL_DAYS)
     # 1) 成分股快照（从已有最新快照前推 40 天起补；首次从起点前 60 天起，按 90 天一段取）
     last_snap = last_date(conn, "SELECT MAX(snap) FROM hs300_members")
@@ -249,8 +249,8 @@ def update_hs300_mv(conn, pro, today):
     for d in need:
         prior = [sn for sn in snaps if sn <= d]
         mem = members[prior[-1]] if prior else members[snaps[0]]          # 早于首个快照的日子，用最早的快照近似
-        df = ts_call(pro.daily_basic, trade_date=d.replace("-", ""), fields="ts_code,trade_date,float_mv")
-        fm = {c: _f(v) for c, v in df[["ts_code", "float_mv"]].values.tolist()}
+        df = ts_call(pro.daily_basic, trade_date=d.replace("-", ""), fields="ts_code,trade_date,circ_mv")
+        fm = {c: _f(v) for c, v in df[["ts_code", "circ_mv"]].values.tolist()}      # 股票 daily_basic 的流通市值列叫 circ_mv（万元）
         got = [fm[c] for c in mem if fm.get(c) is not None]
         if len(mem) and len(got) / len(mem) >= MV_MIN_MATCH:
             conn.execute("INSERT OR REPLACE INTO hs300_mv(date,float_mv,n_members,n_matched) VALUES(?,?,?,?)",
@@ -387,7 +387,7 @@ def run(db_path, pro, offline=False):
             log(conn, "margin", "failed", 0, str(ex))
             print(f"  ⚠ 融资融券取数失败：{str(ex)[:120]}")
 
-        # 沪深300 流通市值（成分股 float_mv 求和）：失败不影响其它
+        # 沪深300 流通市值（成分股 circ_mv 求和）：失败不影响其它
         try:
             n_snap, n_mv, n_skip, n_need = update_hs300_mv(conn, pro, today)
             log(conn, "hs300_mv", "ok", n_mv, f"snap+{n_snap} skip {n_skip}")
@@ -473,7 +473,7 @@ class _FakePro:
 
     def daily_basic(self, trade_date, fields=None):
         rows = [(f"S{i}.SH", trade_date, 1000.0 * (i + 1)) for i in range(5)]
-        return self.pd.DataFrame(rows, columns=["ts_code", "trade_date", "float_mv"])
+        return self.pd.DataFrame(rows, columns=["ts_code", "trade_date", "circ_mv"])
 
     def margin(self, **kw):
         rows = []
