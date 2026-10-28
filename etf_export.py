@@ -24,6 +24,32 @@ def _write(path, obj):
         json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
 
 
+def hs300_share(conn, out_dir, gen, top_n=4):
+    """规模最大的 top_n 只沪深300 ETF 的合计市值 ÷ 沪深300 流通市值（成分股流通市值之和）。
+    ETF 市值 = 份额(万份) × 收盘价(元) → 万元；分母 float_mv 也是万元。只保留"4 只都有份额和收盘价、且分母有值"的日子。"""
+    conn.execute("CREATE TABLE IF NOT EXISTS hs300_mv(date TEXT PRIMARY KEY, float_mv REAL NOT NULL, n_members INTEGER, n_matched INTEGER)")
+    funds = conn.execute("SELECT code,name FROM etf_funds WHERE grp='hs300' ORDER BY sort").fetchall()
+    sh = {c: dict(conn.execute("SELECT date,share FROM etf_share WHERE code=?", (c,)).fetchall()) for c, _ in funds}
+    px = {c: dict(conn.execute("SELECT date,close FROM etf_price WHERE code=?", (c,)).fetchall()) for c, _ in funds}
+    latest = []
+    for c, n in funds:
+        ds = sorted(set(sh[c]) & set(px[c]))
+        if ds:
+            latest.append((sh[c][ds[-1]] * px[c][ds[-1]], c, n))
+    latest.sort(reverse=True)
+    top = [(c, n) for _, c, n in latest[:top_n]]
+    fm = dict(conn.execute("SELECT date,float_mv FROM hs300_mv").fetchall())
+    dates = sorted(d for d in fm if top and all(d in sh[c] and d in px[c] for c, _ in top))
+    parts = {c: [round(sh[c][d] * px[c][d] / fm[d] * 100, 4) for d in dates] for c, _ in top}
+    tot_mv = [sum(sh[c][d] * px[c][d] for c, _ in top) for d in dates]
+    obj = {"generated_at": gen, "funds": [{"code": c, "name": n} for c, n in top], "dates": dates,
+           "ratio": [round(t / fm[d] * 100, 4) for t, d in zip(tot_mv, dates)], "parts": parts,
+           "etf_mv": [round(t / 1e4, 1) for t in tot_mv],                 # 亿元
+           "float_mv": [round(fm[d] / 1e4, 1) for d in dates]}           # 亿元
+    _write(os.path.join(out_dir, "hs300_share.json"), obj)
+    return len(dates)
+
+
 def export(db_path, out_dir):
     conn = sqlite3.connect(db_path)
     gen = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -86,8 +112,10 @@ def export(db_path, out_dir):
         "generated_at": gen, "last_run": last_run, "failed": failed,
         "etf_latest": max((g["dates"][-1] for g in groups.values() if g["dates"]), default=None),
         "margin_latest": dates[-1] if dates else None})
+    n_hs = hs300_share(conn, out_dir, gen)
     conn.close()
-    print(f"导出完成 → {out_dir}：ETF 四组 {sum(len(g['funds']) for g in groups.values())} 只；融资融券 {len(dates)} 天")
+    print(f"沪深300ETF占比：{n_hs} 个交易日")
+    print(f"导出完成 → {out_dir}：ETF {len(groups)} 组 {sum(len(g['funds']) for g in groups.values())} 只；融资融券 {len(dates)} 天")
 
 
 if __name__ == "__main__":

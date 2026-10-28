@@ -114,6 +114,10 @@ def init_db(conn):
       date TEXT NOT NULL, exch TEXT NOT NULL,
       rzye REAL, rzmre REAL, rzche REAL, rqye REAL, rqmcl REAL, rzrqye REAL, rqyl REAL,
       PRIMARY KEY(date, exch));
+    CREATE TABLE IF NOT EXISTS hs300_members(
+      snap TEXT NOT NULL, code TEXT NOT NULL, PRIMARY KEY(snap, code));
+    CREATE TABLE IF NOT EXISTS hs300_mv(
+      date TEXT PRIMARY KEY, float_mv REAL NOT NULL, n_members INTEGER, n_matched INTEGER);
     CREATE TABLE IF NOT EXISTS margin_account(
       date TEXT PRIMARY KEY, avg_ratio REAL, guarantee REAL);
     CREATE TABLE IF NOT EXISTS run_log(
@@ -212,6 +216,49 @@ def load_config(pro, basic):
     with open(CFG_PATH, "w", encoding="utf-8") as f:
         json.dump(to_save, f, ensure_ascii=False, indent=1)
     return out, names
+
+
+# ---------------- 沪深300 流通市值（成分股 float_mv 求和，单位 万元）----------------
+HS300_INDEX = "000300.SH"
+MV_MAX_PER_RUN = 450            # 每次最多补这么多个交易日的 daily_basic（每天 1 次调用，防止首次回填超时；下次接着补）
+MV_MIN_MATCH = 0.9              # 当日成分股里至少 90% 在 daily_basic 里找到，否则该日不入库
+
+
+def update_hs300_mv(conn, pro, today):
+    """成分股快照：index_weight（月度）；流通市值：对每个交易日取 daily_basic 全市场 float_mv，按当时的成分股求和。"""
+    start_d = today - timedelta(days=BACKFILL_DAYS)
+    # 1) 成分股快照（从已有最新快照前推 40 天起补；首次从起点前 60 天起，按 90 天一段取）
+    last_snap = last_date(conn, "SELECT MAX(snap) FROM hs300_members")
+    cur = (datetime.strptime(last_snap, "%Y-%m-%d").date() - timedelta(days=40)) if last_snap else start_d - timedelta(days=60)
+    n_snap = 0
+    while cur <= today:
+        end = min(cur + timedelta(days=90), today)
+        df = ts_call(pro.index_weight, index_code=HS300_INDEX, start_date=_ymd(cur), end_date=_ymd(end))
+        for sn, code in df[["trade_date", "con_code"]].values.tolist():
+            conn.execute("INSERT OR IGNORE INTO hs300_members(snap,code) VALUES(?,?)", (_iso(sn), code)); n_snap += 1
+        cur = end + timedelta(days=1)
+    snaps = [r[0] for r in conn.execute("SELECT DISTINCT snap FROM hs300_members ORDER BY snap")]
+    if not snaps:
+        raise ValueError("index_weight 没有返回沪深300成分股（可能积分/权限不足）")
+    members = {sn: {r[0] for r in conn.execute("SELECT code FROM hs300_members WHERE snap=?", (sn,))} for sn in snaps}
+    # 2) 需要补的交易日：etf_price 里有、hs300_mv 里还没有；先补最近的
+    need = [r[0] for r in conn.execute(
+        "SELECT DISTINCT date FROM etf_price WHERE date>=? AND date NOT IN (SELECT date FROM hs300_mv) ORDER BY date DESC",
+        (start_d.isoformat(),))][:MV_MAX_PER_RUN]
+    n_ok = n_skip = 0
+    for d in need:
+        prior = [sn for sn in snaps if sn <= d]
+        mem = members[prior[-1]] if prior else members[snaps[0]]          # 早于首个快照的日子，用最早的快照近似
+        df = ts_call(pro.daily_basic, trade_date=d.replace("-", ""), fields="ts_code,trade_date,float_mv")
+        fm = {c: _f(v) for c, v in df[["ts_code", "float_mv"]].values.tolist()}
+        got = [fm[c] for c in mem if fm.get(c) is not None]
+        if len(mem) and len(got) / len(mem) >= MV_MIN_MATCH:
+            conn.execute("INSERT OR REPLACE INTO hs300_mv(date,float_mv,n_members,n_matched) VALUES(?,?,?,?)",
+                         (d, float(sum(got)), len(mem), len(got))); n_ok += 1
+        else:
+            n_skip += 1
+    conn.commit()
+    return n_snap, n_ok, n_skip, len(need)
 
 
 # ---------------- 两融账户统计：平均维持担保比例（东方财富数据中心，日度）----------------
@@ -340,6 +387,18 @@ def run(db_path, pro, offline=False):
             log(conn, "margin", "failed", 0, str(ex))
             print(f"  ⚠ 融资融券取数失败：{str(ex)[:120]}")
 
+        # 沪深300 流通市值（成分股 float_mv 求和）：失败不影响其它
+        try:
+            n_snap, n_mv, n_skip, n_need = update_hs300_mv(conn, pro, today)
+            log(conn, "hs300_mv", "ok", n_mv, f"snap+{n_snap} skip {n_skip}")
+            n_ok += 1
+            tot = conn.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM hs300_mv").fetchone()
+            print(f"  沪深300流通市值  本次 +{n_mv} 天（待补 {n_need}，跳过 {n_skip}）；库内共 {tot[0]} 天 {tot[1]} ~ {tot[2]}")
+        except Exception as ex:  # noqa: BLE001
+            n_fail += 1
+            log(conn, "hs300_mv", "failed", 0, str(ex))
+            print(f"  ⚠ 沪深300流通市值取数失败（不影响其它）：{str(ex)[:160]}")
+
         # 平均维持担保比例（市场整体）
         last = last_date(conn, "SELECT MAX(date) FROM margin_account")
         start = (datetime.strptime(last, "%Y-%m-%d").date() - timedelta(days=OVERLAP_DAYS)) if last \
@@ -406,6 +465,16 @@ class _FakePro:
         rows = [(ts_code, _ymd(d), 4.0) for d in self._span(kw)]
         return self.pd.DataFrame(rows, columns=["ts_code", "trade_date", "close"])
 
+    def index_weight(self, index_code, start_date, end_date):
+        snaps = sorted({_ymd(d.replace(day=1)) for d in self.days})
+        rows = [(index_code, f"S{i}.SH", sn, 1.0) for sn in snaps for i in range(5)]
+        return self.pd.DataFrame([r for r in rows if start_date <= r[2] <= end_date] or rows[:0],
+                                 columns=["index_code", "con_code", "trade_date", "weight"])
+
+    def daily_basic(self, trade_date, fields=None):
+        rows = [(f"S{i}.SH", trade_date, 1000.0 * (i + 1)) for i in range(5)]
+        return self.pd.DataFrame(rows, columns=["ts_code", "trade_date", "float_mv"])
+
     def margin(self, **kw):
         rows = []
         for i, d in enumerate(self.days):
@@ -440,6 +509,7 @@ def selftest():
     assert cyb == {"159915.SZ", "159952.SZ"}, cyb                                    # 创业板50、成长 被排除
     assert q("SELECT COUNT(*) FROM etf_price") > 500
     assert q("SELECT COUNT(*) FROM margin_account") > 50
+    assert q("SELECT COUNT(*) FROM hs300_mv") > 50 and q("SELECT MIN(float_mv) FROM hs300_mv") == 15000.0
     n1 = q("SELECT COUNT(*) FROM etf_share"); m1 = q("SELECT COUNT(*) FROM margin")
     assert n1 > 500 and m1 > 100
     conn.close()

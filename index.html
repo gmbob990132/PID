@@ -1034,6 +1034,8 @@ function renderEtfGroup(pane, gk){
   h+='</div>';
   h+='<div class="erp-chart-title" style="margin-top:18px">总份额变化曲线</div><div class="erp-chart-sub">份额增加（涨）<span class="up">●</span>　份额减少（跌）<span class="down">●</span>　点击上方卡片可高亮某只</div><div class="erp-chart" id="etfc1"></div>';
   h+='<div class="erp-chart-title" style="margin-top:18px">合计 · 每日份额净增减</div><div class="erp-chart-sub">柱：当日合计份额较前一日的变化（亿份）；份额增加 = 净申购（红），减少 = 净赎回（绿）</div><div class="erp-chart" id="etfc2"></div>';
+  if(gk==="hs300") h+='<div class="erp-chart-title" style="margin-top:26px">规模最大 4 只沪深300 ETF 占沪深300流通市值比例</div>'+
+    '<div class="erp-chart-sub" id="hsShSub">加载中…</div><div class="erp-chart" id="hsShc" style="height:380px"></div>';
   pane.innerHTML=h; etfBindRange();
   pane.querySelectorAll(".etf-card[data-c]").forEach(el=>el.onclick=()=>{ etfSel=(etfSel===el.dataset.c)?null:el.dataset.c; renderEtfPane(); });
 
@@ -1058,6 +1060,41 @@ function renderEtfGroup(pane, gk){
     series:[{name:"合计日净增减",type:"bar",data:dchg.map(v=>v==null?null:{value:v,itemStyle:{color:v>=0?"#d43f3a":"#3a9d3a"}})}],
   });
   erpCharts.push(c2);
+  if(gk==="hs300") drawHs300Share();
+}
+
+// 最大 4 只沪深300 ETF 的合计市值 ÷ 沪深300 流通市值（成分股流通市值之和）；堆叠面积=各只贡献，右轴叠加沪深300点位。固定显示全部历史（≥3年），可用下方滑块缩放
+async function drawHs300Share(){
+  const sub=document.getElementById("hsShSub"), el=document.getElementById("hsShc"); if(!sub||!el) return;
+  let D, close;
+  try{ D=await loadCached("etf_api/hs300_share.json"); }catch(e){ sub.textContent="数据还没有生成：上传新版 etf_ingest.py / etf_export.py 后，到 Actions 手动运行一次 etf-daily。"; el.style.display="none"; return; }
+  if(!D.dates||!D.dates.length){ sub.textContent="暂无可用数据（沪深300流通市值还没取到，请看 etf-daily 日志里“沪深300流通市值”一行）。"; el.style.display="none"; return; }
+  try{ close=await loadCached("erp_api/csi300/series/close.full.json"); }catch(e){ close={points:[]}; }
+  const cm={}; (close.points||[]).forEach(p=>cm[p.date]=p.value);
+  const n=D.dates.length, last=n-1, cur=D.ratio[last];
+  const mx=Math.max(...D.ratio), mn=Math.min(...D.ratio), imx=D.ratio.indexOf(mx), imn=D.ratio.indexOf(mn);
+  const yrs=((new Date(D.dates[last])-new Date(D.dates[0]))/86400000/365).toFixed(1);
+  sub.innerHTML='最新 '+esc(D.dates[last])+'：'+D.funds.length+' 只合计市值 <b>'+etfFmt(D.etf_mv[last],0)+' 亿元</b>，沪深300流通市值 '+etfFmt(D.float_mv[last],0)+' 亿元，占比 <b>'+cur.toFixed(2)+'%</b>'+
+    '　｜　区间（'+yrs+' 年）最高 '+mx.toFixed(2)+'%（'+esc(D.dates[imx])+'）、最低 '+mn.toFixed(2)+'%（'+esc(D.dates[imn])+'）'+
+    '<br><span style="color:#999">ETF 市值 = 份额 × 当日收盘价；分母 = 沪深300 成分股流通市值之和（按各月成分股快照）。4 只取最新规模最大者：'+D.funds.map(f=>esc(f.name)).join("、")+'</span>';
+  const cs=ETF_COLORS, c=echarts.init(el); erpCharts.push(c);
+  const series=D.funds.map((f,i)=>({name:f.name,type:"line",stack:"s",yAxisIndex:0,showSymbol:false,areaStyle:{opacity:.55},
+    lineStyle:{width:1},itemStyle:{color:cs[i%cs.length]},data:D.parts[f.code]}));
+  series.push({name:"沪深300",type:"line",yAxisIndex:1,showSymbol:false,lineStyle:{width:1.8,color:"#222"},itemStyle:{color:"#222"},
+    data:D.dates.map(d=>cm[d]==null?null:cm[d]),connectNulls:true,z:5});
+  c.setOption({
+    grid:{left:8,right:10,top:56,bottom:64,containLabel:true},
+    legend:{top:0,type:"scroll",data:D.funds.map(f=>f.name).concat(["沪深300"]),icon:"roundRect",itemWidth:14,itemHeight:4},
+    tooltip:{trigger:"axis",formatter:ps=>{
+      const i=ps[0].dataIndex; let h='<b>'+D.dates[i]+'</b><br>';
+      ps.forEach(p=>{ if(p.seriesName==="沪深300") h+=p.marker+'沪深300：'+(p.value==null?"—":Number(p.value).toFixed(2))+'<br>';
+        else h+=p.marker+p.seriesName+'：'+(p.value==null?"—":Number(p.value).toFixed(2)+'%')+'<br>'; });
+      return h+'<b>合计占比 '+D.ratio[i].toFixed(2)+'%</b>　ETF市值 '+etfFmt(D.etf_mv[i],0)+' 亿'; }},
+    xAxis:etfAxisX(D.dates),
+    yAxis:[{type:"value",name:"占流通市值 %",scale:true,splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888",formatter:v=>v+"%"}},
+           {type:"value",name:"沪深300",scale:true,splitLine:{show:false},axisLabel:{color:"#888"}}],
+    dataZoom:[{type:"inside"},{type:"slider",height:18,bottom:30}],
+    series});
 }
 
 function renderMarginPane(pane){
