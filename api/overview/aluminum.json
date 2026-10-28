@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-27T06:32:34+00:00",
+  "generated_at": "2026-10-28T07:02:11+00:00",
   "module": "aluminum",
-  "today": "2026-10-27",
+  "today": "2026-10-28",
   "metrics": [
     {
       "id": "al_spot_east",
@@ -14,16 +14,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-10-27",
-        "value": 23890.0,
-        "mom": -80.0,
+        "date": "2026-10-28",
+        "value": 23930.0,
+        "mom": 40.0,
         "yoy": null,
-        "src_change": -80.0,
+        "src_change": 40.0,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 8
       }
@@ -38,16 +38,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-10-27",
-        "value": 23880.0,
-        "mom": -40.0,
+        "date": "2026-10-28",
+        "value": 23910.0,
+        "mom": 30.0,
         "yoy": null,
-        "src_change": -40.0,
+        "src_change": 30.0,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 8
       }
@@ -62,16 +62,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-10-27",
-        "value": 23710.0,
-        "mom": -100.0,
+        "date": "2026-10-28",
+        "value": 23730.0,
+        "mom": 20.0,
         "yoy": null,
-        "src_change": -100.0,
+        "src_change": 20.0,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 8
       }
@@ -95,7 +95,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 2
       }
@@ -119,9 +119,9 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
-        "status": "ok",
-        "rows_written": 261
+        "run_at": "2026-10-28T07:00:49+00:00",
+        "status": "failed",
+        "rows_written": 0
       }
     },
     {
@@ -143,9 +143,9 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
-        "status": "ok",
-        "rows_written": 261
+        "run_at": "2026-10-28T07:00:49+00:00",
+        "status": "failed",
+        "rows_written": 0
       }
     },
     {
@@ -158,16 +158,16 @@
       "hide_overview": false,
       "hide_chart": true,
       "latest": {
-        "date": "2026-10-27",
-        "value": 3030.0,
-        "mom": -5.5,
-        "yoy": 152.5,
+        "date": "2026-10-28",
+        "value": 3099.5,
+        "mom": 4.5,
+        "yoy": 205.5,
         "src_change": null,
         "region": null
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 2537
       }
@@ -182,18 +182,18 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-10-26",
-        "value": 23.41,
-        "mom": -0.16999999999999815,
-        "yoy": -23.900000000000002,
+        "date": "2026-10-27",
+        "value": 23.21,
+        "mom": -0.1999999999999993,
+        "yoy": -23.72,
         "src_change": null,
         "region": null
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
-        "rows_written": 207
+        "rows_written": 208
       }
     },
     {
@@ -206,16 +206,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-10-27",
+        "date": "2026-10-28",
         "value": 2675.0,
-        "mom": -5.0,
+        "mom": 0.0,
         "yoy": null,
-        "src_change": -5.0,
+        "src_change": 0.0,
         "region": "山西"
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -230,16 +230,16 @@
       "hide_overview": false,
       "hide_chart": false,
       "latest": {
-        "date": "2026-10-27",
-        "value": 23880.0,
-        "mom": -80.0,
+        "date": "2026-10-28",
+        "value": 23920.0,
+        "mom": 40.0,
         "yoy": null,
-        "src_change": -80.0,
+        "src_change": 40.0,
         "region": "无锡"
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -254,7 +254,7 @@
       "hide_overview": false,
       "hide_chart": true,
       "latest": {
-        "date": "2026-10-27",
+        "date": "2026-10-28",
         "value": 6280.0,
         "mom": 0.0,
         "yoy": null,
@@ -263,7 +263,7 @@
       },
       "updated_today": true,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 1
       }
@@ -287,7 +287,7 @@
       },
       "updated_today": false,
       "last_ingest": {
-        "run_at": "2026-10-27T06:32:23+00:00",
+        "run_at": "2026-10-28T07:00:49+00:00",
         "status": "ok",
         "rows_written": 47
       }
