@@ -50,6 +50,16 @@ def hs300_share(conn, out_dir, gen, top_n=4):
     return len(dates)
 
 
+def turnover(conn, out_dir, gen):
+    conn.execute("CREATE TABLE IF NOT EXISTS turnover(date TEXT PRIMARY KEY, sh REAL, sz REAL, bj REAL, sh_close REAL)")
+    rows = conn.execute("SELECT date,sh,sz,bj,sh_close FROM turnover WHERE sh IS NOT NULL AND sz IS NOT NULL ORDER BY date").fetchall()
+    _write(os.path.join(out_dir, "turnover.json"), {
+        "generated_at": gen, "unit": "亿元", "dates": [r[0] for r in rows],
+        "sh": [r[1] for r in rows], "sz": [r[2] for r in rows], "bj": [r[3] for r in rows],
+        "sh_close": [r[4] for r in rows]})
+    return len(rows)
+
+
 def export(db_path, out_dir):
     conn = sqlite3.connect(db_path)
     gen = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -113,7 +123,9 @@ def export(db_path, out_dir):
         "etf_latest": max((g["dates"][-1] for g in groups.values() if g["dates"]), default=None),
         "margin_latest": dates[-1] if dates else None})
     n_hs = hs300_share(conn, out_dir, gen)
+    n_to = turnover(conn, out_dir, gen)
     conn.close()
+    print(f"A股成交额：{n_to} 个交易日")
     print(f"沪深300ETF占比：{n_hs} 个交易日")
     print(f"导出完成 → {out_dir}：ETF {len(groups)} 组 {sum(len(g['funds']) for g in groups.values())} 只；融资融券 {len(dates)} 天")
 

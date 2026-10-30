@@ -120,6 +120,8 @@ def init_db(conn):
       date TEXT PRIMARY KEY, float_mv REAL NOT NULL, n_members INTEGER, n_matched INTEGER);
     CREATE TABLE IF NOT EXISTS margin_account(
       date TEXT PRIMARY KEY, avg_ratio REAL, guarantee REAL);
+    CREATE TABLE IF NOT EXISTS turnover(
+      date TEXT PRIMARY KEY, sh REAL, sz REAL, bj REAL, sh_close REAL);
     CREATE TABLE IF NOT EXISTS run_log(
       id INTEGER PRIMARY KEY AUTOINCREMENT, run_at TEXT, item TEXT, status TEXT, rows INTEGER, message TEXT);
     """)
@@ -266,6 +268,41 @@ ACCOUNT_URL = ("https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=
                "&columns=ALL&pageSize=500&sortColumns=STATISTICS_DATE&sortTypes=-1&pageNumber=")
 
 
+# ---------------- A股每日成交额 ----------------
+TURNOVER_START = "2016-01-01"
+TURNOVER_IDX = {"sh": "000001.SH", "sz": "399106.SZ", "bj": "899050.BJ"}   # 上证综指 / 深证综指 / 北证50（全市场口径近似）
+
+
+def update_turnover(conn, pro, today):
+    """三个指数的 amount（千元）→ 亿元。沪、深必须成功；北交所取不到只记警告。返回写入行数。"""
+    last = last_date(conn, "SELECT MAX(date) FROM turnover")
+    start = (datetime.strptime(last, "%Y-%m-%d").date() - timedelta(days=OVERLAP_DAYS)).isoformat() if last else TURNOVER_START
+    got = {}
+    for k, code in TURNOVER_IDX.items():
+        try:
+            df = ts_call(pro.index_daily, ts_code=code, start_date=start.replace("-", ""), end_date=_ymd(today),
+                         fields="ts_code,trade_date,close,amount")
+        except Exception as ex:  # noqa: BLE001
+            if k != "bj":
+                raise
+            print(f"  ⚠ 北交所成交额取数失败（忽略）：{str(ex)[:100]}")
+            continue
+        got[k] = {_iso(str(r[0])): (_f(r[1]), _f(r[2])) for r in df[["trade_date", "close", "amount"]].values.tolist()} \
+            if df is not None and len(df) else {}
+    if not got.get("sh") or not got.get("sz"):
+        raise RuntimeError("上证/深证指数成交额为空")
+    n = 0
+    for d in sorted(set(got["sh"]) & set(got["sz"])):
+        a = lambda k: (got.get(k, {}).get(d, (None, None))[1])
+        conv = lambda v: None if v is None else round(v / 1e5, 2)          # 千元 → 亿元
+        conn.execute("INSERT INTO turnover(date,sh,sz,bj,sh_close) VALUES(?,?,?,?,?) ON CONFLICT(date) DO UPDATE SET "
+                     "sh=excluded.sh, sz=excluded.sz, bj=excluded.bj, sh_close=excluded.sh_close",
+                     (d, conv(a("sh")), conv(a("sz")), conv(a("bj")), got["sh"][d][0]))
+        n += 1
+    conn.commit()
+    return n
+
+
 def fetch_account_info(since):
     """返回 [(YYYY-MM-DD, 平均维持担保比例, 担保物总价值(元))]，只取 since（YYYY-MM-DD）之后。按日期倒序分页，翻到早于 since 就停。"""
     from urllib.request import Request, urlopen
@@ -399,6 +436,19 @@ def run(db_path, pro, offline=False):
             log(conn, "hs300_mv", "failed", 0, str(ex))
             print(f"  ⚠ 沪深300流通市值取数失败（不影响其它）：{str(ex)[:160]}")
 
+        # A股每日成交额
+        try:
+            n_t = update_turnover(conn, pro, today)
+            log(conn, "turnover", "ok", n_t)
+            n_ok += 1
+            t = conn.execute("SELECT COUNT(*),MIN(date),MAX(date) FROM turnover").fetchone()
+            lt = conn.execute("SELECT date, sh+sz+COALESCE(bj,0) FROM turnover ORDER BY date DESC LIMIT 1").fetchone()
+            print(f"  A股成交额  本次 +{n_t} 天；库内 {t[0]} 天 {t[1]} ~ {t[2]}；最新 {lt[0]} = {lt[1]:.0f} 亿元")
+        except Exception as ex:  # noqa: BLE001
+            n_fail += 1
+            log(conn, "turnover", "failed", 0, str(ex))
+            print(f"  ⚠ A股成交额取数失败（不影响其它）：{str(ex)[:160]}")
+
         # 平均维持担保比例（市场整体）
         last = last_date(conn, "SELECT MAX(date) FROM margin_account")
         start = (datetime.strptime(last, "%Y-%m-%d").date() - timedelta(days=OVERLAP_DAYS)) if last \
@@ -475,6 +525,13 @@ class _FakePro:
         rows = [(f"S{i}.SH", trade_date, 1000.0 * (i + 1)) for i in range(5)]
         return self.pd.DataFrame(rows, columns=["ts_code", "trade_date", "circ_mv"])
 
+    def index_daily(self, ts_code, start_date, end_date, fields=None):
+        if ts_code == "899050.BJ":
+            return self.pd.DataFrame([], columns=["ts_code", "trade_date", "close", "amount"])
+        k = 4e8 if ts_code.endswith(".SH") else 6e8
+        rows = [(ts_code, _ymd(d), 3000.0 + i, k + i * 1e6) for i, d in enumerate(self.days) if start_date <= _ymd(d) <= end_date]
+        return self.pd.DataFrame(rows, columns=["ts_code", "trade_date", "close", "amount"])
+
     def margin(self, **kw):
         rows = []
         for i, d in enumerate(self.days):
@@ -510,6 +567,7 @@ def selftest():
     assert q("SELECT COUNT(*) FROM etf_price") > 500
     assert q("SELECT COUNT(*) FROM margin_account") > 50
     assert q("SELECT COUNT(*) FROM hs300_mv") > 50 and q("SELECT MIN(float_mv) FROM hs300_mv") == 15000.0
+    assert q("SELECT COUNT(*) FROM turnover") > 50 and abs(q("SELECT sh FROM turnover ORDER BY date LIMIT 1") - 4000.0) < 1, "turnover"
     n1 = q("SELECT COUNT(*) FROM etf_share"); m1 = q("SELECT COUNT(*) FROM margin")
     assert n1 > 500 and m1 > 100
     conn.close()

@@ -925,6 +925,7 @@ const ETF_WINS=[[1,"近1日"],[2,"近2日"],[3,"近3日"],[5,"近1周"],[10,"近
 const ETF_COLORS=["#d4533a","#2a8bd4","#e0a53b","#3aa86b","#8a5cc8","#7a8a99"];
 let etfSub="hs300", etfRange="1y", etfWin=1, etfSel=null, etfData=null, marginData=null, etfMeta=null, etfErr="", marginEx="all";
 
+let turnData=null;
 async function selectEtf(){
   curTop="etf"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
   renderIndBar(); renderEtfSubBar();
@@ -933,12 +934,13 @@ async function selectEtf(){
   try{
     [etfData, marginData] = await Promise.all([loadCached("etf_api/etf.json"), loadCached("etf_api/margin.json")]);
     etfMeta = await loadCached("etf_api/meta.json").catch(()=>null);
+    turnData = await loadCached("etf_api/turnover.json").catch(()=>null);
   }catch(e){ etfData=null; marginData=null; etfErr="ETF/两融数据还没有生成。请到仓库 Actions 页面手动运行一次 etf-daily。"; }
   renderEtfPane();
 }
 function renderEtfSubBar(){
   const bar=document.getElementById("subBar"); bar.innerHTML="";
-  [["hs300","沪深300 ETF"],["sse50","上证50 ETF"],["csi500","中证500 ETF"],["kc50","科创50 ETF"],["cyb","创业板 ETF"],["margin","融资融券"]].forEach(([k,lb])=>{
+  [["hs300","沪深300 ETF"],["sse50","上证50 ETF"],["csi500","中证500 ETF"],["kc50","科创50 ETF"],["cyb","创业板 ETF"],["margin","融资融券"],["turn","A股成交额"]].forEach(([k,lb])=>{
     const b=document.createElement("button");
     b.className="sub-btn"+(k===etfSub?" on":""); b.textContent=lb;
     b.onclick=()=>{ etfSub=k; etfSel=null; renderEtfSubBar(); renderEtfPane(); };
@@ -1000,7 +1002,7 @@ function etfAxisX(dates){ return {type:"category",data:dates,boundaryGap:false,a
 function renderEtfPane(){
   const pane=document.getElementById("pane"); etfDispose();
   if(etfErr||!etfData||!marginData){ pane.innerHTML='<div class="empty">'+esc(etfErr||"暂无数据")+'</div>'; return; }
-  if(etfSub==="margin") renderMarginPane(pane); else renderEtfGroup(pane, etfSub);
+  if(etfSub==="margin") renderMarginPane(pane); else if(etfSub==="turn") renderTurnPane(pane); else renderEtfGroup(pane, etfSub);
 }
 
 function renderEtfGroup(pane, gk){
@@ -1097,6 +1099,49 @@ async function drawHs300Share(){
     series});
 }
 
+function renderTurnPane(pane){
+  const T=turnData;
+  if(!T||!T.dates.length){ pane.innerHTML='<div class="empty">还没有成交额数据。请到仓库 Actions 页面手动运行一次 etf-daily。</div>'; return; }
+  const n=T.dates.length, nz=v=>v==null?0:v;
+  const tot=T.dates.map((_,i)=>+(nz(T.sh[i])+nz(T.sz[i])+nz(T.bj[i])).toFixed(2));
+  const ma=(k)=>tot.map((_,i)=>i<k-1?null:+(tot.slice(i-k+1,i+1).reduce((a,b)=>a+b,0)/k).toFixed(1));
+  const ma5=ma(5), ma20=ma(20);
+  const cut=etfCutoff(T.dates), ix=[]; T.dates.forEach((d,i)=>{ if(d>=cut) ix.push(i); });
+  const dates=ix.map(i=>T.dates[i]), pick=a=>ix.map(i=>a[i]);
+  const L=n-1, P=n-2, last=tot[L], prev=tot[P];
+  const wan=v=>v==null?"—":(v>=1e4?(v/1e4).toFixed(2)+" <span class=\"u\">万亿</span>":Math.round(v)+" <span class=\"u\">亿</span>");
+  const pctTxt=(a,b)=>{ if(a==null||b==null||!b) return '<span class="flat">—</span>'; const p=(a/b-1)*100; return '<span class="'+(p>0?"up":p<0?"down":"flat")+'">'+(p>0?"+":"")+p.toFixed(1)+'%</span>'; };
+  const win=tot.slice(Math.max(0,n-250));                          // 近一年（约250个交易日）分位
+  const rank=Math.round(win.filter(v=>v<=last).length/win.length*100);
+  const shr=T.sh[L]/(nz(T.sh[L])+nz(T.sz[L])+nz(T.bj[L]))*100;
+  const card=(nm,val,sub)=>'<div class="card etf-card"><div class="nm">'+nm+'</div><div class="val">'+val+'</div><div class="chg">'+sub+'</div></div>';
+  let h='<div class="etf-head"><span class="t">A股每日成交额</span><span class="chip">'+dates.length+' 个交易日</span><span class="upd">数据至 '+esc(T.dates[L])+'（沪+深+北交所合计，单位：亿元）</span></div>'+etfRangeBar();
+  h+='<div class="grid etf-cards" style="margin-top:10px">'+
+    card("最新成交额（"+T.dates[L].slice(5)+"）",wan(last),"较前一日 "+pctTxt(last,prev))+
+    card("近5日均值",wan(ma5[L]),"较前5日 "+pctTxt(ma5[L],ma5[L-5]))+
+    card("近20日均值",wan(ma20[L]),"较前20日 "+pctTxt(ma20[L],ma20[L-20]))+
+    card("近一年分位",rank+' <span class="u">%</span>',"最新值在近一年中的位置")+
+    card("沪市占比",shr.toFixed(1)+' <span class="u">%</span>',"深市 "+(T.sz[L]/(nz(T.sh[L])+nz(T.sz[L])+nz(T.bj[L]))*100).toFixed(1)+"%")+'</div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">每日成交额（沪 / 深 / 北交所）与 上证指数</div><div class="erp-chart-sub">堆叠柱：成交额（亿元，左轴）；线：上证指数收盘（右轴）。沪=上证综指口径，深=深证综指口径，北=北证50口径，与交易所公布的市场总成交额略有出入。</div><div class="erp-chart" id="tvc1"></div>';
+  h+='<div class="erp-chart-title" style="margin-top:18px">合计成交额 与 5日/20日均线</div><div class="erp-chart-sub">单位：亿元；虚线 1 万亿 / 2 万亿为常用参考线</div><div class="erp-chart" id="tvc2"></div>';
+  pane.innerHTML=h; { const w=document.getElementById("etfWins"); if(w&&w.parentNode) w.parentNode.remove(); } etfBindRange();
+  const mk=(id,opt)=>{ const c=echarts.init(document.getElementById(id)); c.setOption(opt); erpCharts.push(c); };
+  const grid={left:8,right:12,top:34,bottom:24,containLabel:true};
+  const ax=etfAxisX(dates), yv={type:"value",splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}};
+  mk("tvc1",{grid,xAxis:ax,tooltip:{trigger:"axis"},legend:{top:0,data:["沪市","深市","北交所","上证指数"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    yAxis:[yv,{type:"value",scale:true,splitLine:{show:false},axisLabel:{color:"#888"}}],
+    dataZoom:[{type:"inside"}],
+    series:[{name:"沪市",type:"bar",stack:"t",data:pick(T.sh),itemStyle:{color:"#2a6fdb"}},
+            {name:"深市",type:"bar",stack:"t",data:pick(T.sz),itemStyle:{color:"#e0a12c"}},
+            {name:"北交所",type:"bar",stack:"t",data:pick(T.bj),itemStyle:{color:"#8a8f98"}},
+            {name:"上证指数",type:"line",yAxisIndex:1,showSymbol:false,data:pick(T.sh_close),lineStyle:{width:1.5,color:"#d4533a"},itemStyle:{color:"#d4533a"}}]});
+  mk("tvc2",{grid,xAxis:ax,tooltip:{trigger:"axis"},legend:{top:0,data:["合计","5日均","20日均"],icon:"roundRect",itemWidth:14,itemHeight:3},
+    yAxis:yv,dataZoom:[{type:"inside"}],
+    series:[{name:"合计",type:"bar",data:pick(tot),itemStyle:{color:"#c9d6ee"},
+              markLine:{silent:true,symbol:"none",data:[{yAxis:10000},{yAxis:20000}].map(o=>({...o,lineStyle:{type:"dashed",color:"#d4533a",width:1},label:{formatter:(o.yAxis/10000)+"万亿",color:"#d4533a",position:"end"}}))}},
+            {name:"5日均",type:"line",showSymbol:false,data:pick(ma5),lineStyle:{width:1.5},itemStyle:{color:"#2a6fdb"}},
+            {name:"20日均",type:"line",showSymbol:false,data:pick(ma20),lineStyle:{width:1.5},itemStyle:{color:"#e0a12c"}}]});
+}
 function renderMarginPane(pane){
   const M=marginData, S=M.series[marginEx]; if(!M.dates.length){ pane.innerHTML='<div class="empty">还没有融资融券数据</div>'; return; }
   const cut=etfCutoff(M.dates), ix=[]; M.dates.forEach((d,i)=>{ if(d>=cut) ix.push(i); });
