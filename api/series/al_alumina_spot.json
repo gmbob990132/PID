@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-31T07:14:18+00:00",
+  "metric": {
+    "id": "al_alumina_spot",
+    "name": "氧化铝现货",
+    "category": "cost",
+    "unit": "元/吨"
+  },
+  "range": "recent",
+  "points": [
+    {
+      "date": "2026-09-09",
+      "value": 2710.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-10",
+      "value": 2710.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-11",
+      "value": 2710.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-15",
+      "value": 2710.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-16",
+      "value": 2710.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-17",
+      "value": 2710.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-18",
+      "value": 2705.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-09-21",
+      "value": 2705.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-22",
+      "value": 2705.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-23",
+      "value": 2705.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-24",
+      "value": 2705.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-28",
+      "value": 2705.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-29",
+      "value": 2705.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-30",
+      "value": 2700.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-10-08",
+      "value": 2700.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-09",
+      "value": 2700.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-12",
+      "value": 2695.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-10-13",
+      "value": 2695.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-14",
+      "value": 2690.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-10-15",
+      "value": 2685.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-10-16",
+      "value": 2680.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-10-19",
+      "value": 2680.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-20",
+      "value": 2680.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-21",
+      "value": 2680.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-22",
+      "value": 2680.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-23",
+      "value": 2680.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-26",
+      "value": 2680.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-27",
+      "value": 2675.0,
+      "change": -5.0,
+      "src_change": -5.0
+    },
+    {
+      "date": "2026-10-28",
+      "value": 2675.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-29",
+      "value": 2675.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-10-30",
+      "value": 2670.0,
+      "change": -5.0,
+      "src_change": -5.0
+    }
+  ]
+}

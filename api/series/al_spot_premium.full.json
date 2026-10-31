@@ -1,0 +1,319 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-31T07:14:18+00:00",
+  "metric": {
+    "id": "al_spot_premium",
+    "name": "现货升贴水",
+    "category": "price",
+    "unit": "元/吨"
+  },
+  "range": "full",
+  "points": [
+    {
+      "date": "2026-08-13",
+      "value": 40.0,
+      "change": null,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-14",
+      "value": -15.0,
+      "change": -55.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-17",
+      "value": 35.0,
+      "change": 50.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-18",
+      "value": -55.0,
+      "change": -90.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-19",
+      "value": -5.0,
+      "change": 50.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-20",
+      "value": 5.0,
+      "change": 10.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-21",
+      "value": -30.0,
+      "change": -35.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-24",
+      "value": 35.0,
+      "change": 65.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-25",
+      "value": -15.0,
+      "change": -50.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-26",
+      "value": 110.0,
+      "change": 125.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-27",
+      "value": 100.0,
+      "change": -10.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-28",
+      "value": -20.0,
+      "change": -120.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-08-31",
+      "value": -105.0,
+      "change": -85.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-01",
+      "value": 0.0,
+      "change": 105.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-02",
+      "value": -20.0,
+      "change": -20.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-03",
+      "value": -20.0,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-04",
+      "value": 70.0,
+      "change": 90.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-07",
+      "value": -10.0,
+      "change": -80.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-08",
+      "value": 0.0,
+      "change": 10.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-09",
+      "value": 0.0,
+      "change": 0.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-10",
+      "value": 70.0,
+      "change": 70.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-11",
+      "value": 5.0,
+      "change": -65.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-14",
+      "value": 45.0,
+      "change": 40.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-15",
+      "value": 35.0,
+      "change": -10.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-16",
+      "value": -25.0,
+      "change": -60.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-17",
+      "value": -45.0,
+      "change": -20.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-18",
+      "value": -20.0,
+      "change": 25.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-21",
+      "value": 100.0,
+      "change": 120.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-22",
+      "value": 30.0,
+      "change": -70.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-23",
+      "value": 35.0,
+      "change": 5.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-24",
+      "value": 40.0,
+      "change": 5.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-28",
+      "value": 220.0,
+      "change": 180.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-29",
+      "value": 90.0,
+      "change": -130.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-09-30",
+      "value": 200.0,
+      "change": 110.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-08",
+      "value": 375.0,
+      "change": 175.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-09",
+      "value": 190.0,
+      "change": -185.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-12",
+      "value": 345.0,
+      "change": 155.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-13",
+      "value": 400.0,
+      "change": 55.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-14",
+      "value": 335.0,
+      "change": -65.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-15",
+      "value": 230.0,
+      "change": -105.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-16",
+      "value": 200.0,
+      "change": -30.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-19",
+      "value": 680.0,
+      "change": 480.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-20",
+      "value": 485.0,
+      "change": -195.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-21",
+      "value": 560.0,
+      "change": 75.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-22",
+      "value": 535.0,
+      "change": -25.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-23",
+      "value": 320.0,
+      "change": -215.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-26",
+      "value": 520.0,
+      "change": 200.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-27",
+      "value": 485.0,
+      "change": -35.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-28",
+      "value": 390.0,
+      "change": -95.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-29",
+      "value": 430.0,
+      "change": 40.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-10-30",
+      "value": 385.0,
+      "change": -45.0,
+      "src_change": null
+    }
+  ]
+}
