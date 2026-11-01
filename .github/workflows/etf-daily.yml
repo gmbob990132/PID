@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install tushare pandas
+      - run: pip install tushare pandas six
       - run: python3 etf_ingest.py
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
