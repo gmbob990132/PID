@@ -1,0 +1,322 @@
+{
+  "_说明": "每条 = 一个原始指标序列。加指标：在这里加一条，并在 macro_ingest.py 的 ADAPTERS 里实现取数函数（或复用已有的）。group 决定页面分区；line 是图上的参考线（如 PMI 荣枯线 50）。",
+  "groups": [
+    {
+      "id": "inflation",
+      "name": "通胀"
+    },
+    {
+      "id": "growth",
+      "name": "景气与资金"
+    },
+    {
+      "id": "profit",
+      "name": "利润与投资"
+    },
+    {
+      "id": "property",
+      "name": "地产"
+    },
+    {
+      "id": "fx",
+      "name": "汇率与利差"
+    }
+  ],
+  "indicators": [
+    {
+      "key": "cpi_yoy",
+      "name": "CPI 同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "inflation",
+      "sources": [
+        {
+          "adapter": "jin10",
+          "params": {
+            "fn": "macro_china_cpi_yearly"
+          }
+        },
+        {
+          "adapter": "tushare_cn",
+          "params": {
+            "fn": "cn_cpi",
+            "col": "nt_yoy"
+          }
+        }
+      ]
+    },
+    {
+      "key": "ppi_yoy",
+      "name": "PPI 同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "inflation",
+      "sources": [
+        {
+          "adapter": "jin10",
+          "params": {
+            "fn": "macro_china_ppi_yearly"
+          }
+        },
+        {
+          "adapter": "tushare_cn",
+          "params": {
+            "fn": "cn_ppi",
+            "col": "ppi_yoy"
+          }
+        }
+      ]
+    },
+    {
+      "key": "pmi_mfg",
+      "name": "制造业 PMI",
+      "unit": "",
+      "freq": "M",
+      "group": "growth",
+      "sources": [
+        {
+          "adapter": "jin10",
+          "params": {
+            "fn": "macro_china_pmi_yearly"
+          }
+        },
+        {
+          "adapter": "tushare_cn",
+          "params": {
+            "fn": "cn_pmi",
+            "col": "pmi010000"
+          }
+        }
+      ],
+      "line": 50
+    },
+    {
+      "key": "m2_yoy",
+      "name": "M2 同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "growth",
+      "sources": [
+        {
+          "adapter": "money_supply",
+          "params": {
+            "col": "M2同比"
+          }
+        },
+        {
+          "adapter": "tushare_cn",
+          "params": {
+            "fn": "cn_m",
+            "col": "m2_yoy"
+          }
+        }
+      ]
+    },
+    {
+      "key": "m1_yoy",
+      "name": "M1 同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "growth",
+      "sources": [
+        {
+          "adapter": "money_supply",
+          "params": {
+            "col": "M1同比"
+          }
+        },
+        {
+          "adapter": "tushare_cn",
+          "params": {
+            "fn": "cn_m",
+            "col": "m1_yoy"
+          }
+        }
+      ]
+    },
+    {
+      "key": "shrz_yoy",
+      "name": "社融存量同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "growth",
+      "sources": [
+        {
+          "adapter": "tushare_sf_stock_yoy"
+        }
+      ]
+    },
+    {
+      "key": "profit_ytd",
+      "name": "工业企业利润 累计同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "profit",
+      "sources": [
+        {
+          "adapter": "nbs_release",
+          "params": {
+            "key": "profit_ytd"
+          }
+        }
+      ],
+      "note": "统计局发布稿解析，约2019年起"
+    },
+    {
+      "key": "profit_m",
+      "name": "工业企业利润 当月同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "profit",
+      "sources": [
+        {
+          "adapter": "nbs_release",
+          "params": {
+            "key": "profit_m"
+          }
+        }
+      ],
+      "note": "统计局发布稿解析，约2019年起"
+    },
+    {
+      "key": "fai_yoy",
+      "name": "固定资产投资 当月同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "profit",
+      "sources": [
+        {
+          "adapter": "gdzctz"
+        }
+      ]
+    },
+    {
+      "key": "re_invest",
+      "name": "房地产开发投资 累计同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "property",
+      "sources": [
+        {
+          "adapter": "nbs_release",
+          "params": {
+            "key": "re_invest"
+          }
+        }
+      ],
+      "note": "统计局发布稿解析（年初至本月累计同比），约2019年起"
+    },
+    {
+      "key": "re_sales",
+      "name": "商品房销售面积 累计同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "property",
+      "sources": [
+        {
+          "adapter": "nbs_release",
+          "params": {
+            "key": "re_sales"
+          }
+        }
+      ],
+      "note": "统计局发布稿解析（年初至本月累计同比），约2019年起"
+    },
+    {
+      "key": "house_t1",
+      "name": "一线城市新建住宅价格同比",
+      "unit": "%",
+      "freq": "M",
+      "group": "property",
+      "sources": [
+        {
+          "adapter": "new_house",
+          "params": {
+            "cities": [
+              "北京",
+              "上海",
+              "广州",
+              "深圳"
+            ],
+            "col": "同比"
+          }
+        }
+      ],
+      "note": "北上广深四城简单平均（官方70城无全国汇总口径）"
+    },
+    {
+      "key": "usdcnh",
+      "name": "美元兑人民币（离岸）",
+      "unit": "",
+      "freq": "D",
+      "group": "fx",
+      "sources": [
+        {
+          "adapter": "usdcnh"
+        }
+      ]
+    },
+    {
+      "key": "cn10y",
+      "name": "中国10年国债收益率",
+      "unit": "%",
+      "freq": "D",
+      "group": "fx",
+      "sources": [
+        {
+          "adapter": "bond_us_cn",
+          "params": {
+            "col": "中国国债收益率10年"
+          }
+        }
+      ]
+    },
+    {
+      "key": "us10y",
+      "name": "美国10年国债收益率",
+      "unit": "%",
+      "freq": "D",
+      "group": "fx",
+      "sources": [
+        {
+          "adapter": "bond_us_cn",
+          "params": {
+            "col": "美国国债收益率10年"
+          }
+        }
+      ]
+    }
+  ],
+  "derived": [
+    {
+      "key": "cpi_ppi_gap",
+      "name": "CPI−PPI 剪刀差",
+      "unit": "个百分点",
+      "freq": "M",
+      "group": "inflation",
+      "a": "cpi_yoy",
+      "b": "ppi_yoy",
+      "op": "sub"
+    },
+    {
+      "key": "m1_m2_gap",
+      "name": "M1−M2 剪刀差",
+      "unit": "个百分点",
+      "freq": "M",
+      "group": "growth",
+      "a": "m1_yoy",
+      "b": "m2_yoy",
+      "op": "sub"
+    },
+    {
+      "key": "cn_us_spread",
+      "name": "中美10年利差（中−美）",
+      "unit": "个百分点",
+      "freq": "D",
+      "group": "fx",
+      "a": "cn10y",
+      "b": "us10y",
+      "op": "sub"
+    }
+  ]
+}
