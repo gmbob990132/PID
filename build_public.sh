@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf dist && mkdir dist
 cp index.html dist/
-for d in api valuation_api erp_api metals_api agri_api coal_api etf_api; do
+for d in api valuation_api erp_api metals_api agri_api coal_api etf_api macro_api; do
   [ -d "$d" ] && cp -r "$d" dist/
 done
 # 删掉"技术指标分析"按钮

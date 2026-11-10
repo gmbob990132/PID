@@ -75,6 +75,24 @@
   .agri-acc{grid-column:1/-1;background:var(--card);border:1px solid var(--navy);border-radius:16px;padding:10px 14px;margin-top:-4px}
   .agri-sub{font-size:12.5px;color:var(--sec);margin:4px 2px 6px}
 
+  /* ===== 宏观数据 ===== */
+  .mc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;margin-top:10px}
+  .mc-bar .grp{display:flex;align-items:center;gap:8px}
+  .mc-bar .lab{font-size:12.5px;color:var(--muted)}
+  .mc-bar .ranges{margin:0;flex-wrap:wrap}
+  .mc-bar .rg{white-space:nowrap}
+  .mc-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px}
+  .mc-card{background:#fff;border:1px solid var(--line,#e6e9ee);border-radius:12px;padding:10px 12px;cursor:pointer}
+  .mc-card:hover{border-color:var(--accent,#2a6fdb)}
+  .mc-card.empty{cursor:default;opacity:.6}
+  .mc-card .nm{font-size:12px;color:#666}
+  .mc-card .val{font-size:22px;font-weight:700;margin:2px 0}
+  .mc-card .val .u{font-size:12px;font-weight:400;color:#888;margin-left:2px}
+  .mc-card .chg{font-size:12px}
+  .mc-card .sub{font-size:11px;color:#999}
+  .mc-sec{font-size:16px;font-weight:700;margin:24px 0 8px;padding-left:8px;border-left:4px solid var(--accent,#2a6fdb)}
+  .mc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:900px){.mc-grid{grid-template-columns:1fr}}
   /* ===== 技术指标分析 ===== */
   .wrap.wide{max-width:1180px}
   .tech-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:6px 0 4px}
@@ -259,7 +277,11 @@ function renderIndBar(){
   ef.className="ind-btn"+(curTop==="etf"?" on":"");
   ef.textContent="ETF·两融"; ef.onclick=()=>selectEtf();
   bar.appendChild(ef);
-  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf");
+  const mc=document.createElement("button");    // 宏观数据模块
+  mc.className="ind-btn"+(curTop==="macro"?" on":"");
+  mc.textContent="宏观数据"; mc.onclick=()=>selectMacro();
+  bar.appendChild(mc);
+  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf"||curTop==="macro");
 }
 
 async function selectModule(id){
@@ -918,6 +940,128 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;"
 function stChip(s){ return '<span class="st st-'+(TECH_ST_CLS[s]||"x")+'">'+esc(s)+'</span>'; }
 function fnum(v,dp){ return v==null||isNaN(v)?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
 function pctHtml(v){ if(v==null) return "—"; return '<span class="'+chgClass(v)+'">'+(v>0?"+":"")+v.toFixed(2)+'%</span>'; }
+
+// ================== 宏观数据模块（通胀 / 景气与资金 / 利润 / 地产 / 汇率与利差；数据：macro_api/macro.json，由 macro-daily 更新）==================
+const MAC_RANGES=[["3y","近3年",3],["10y","近10年",10],["20y","近20年",20],["all","全部",null]];
+const MAC_SECS=[["mc-top","概览"],["mc-sec-inflation","通胀"],["mc-sec-growth","景气与资金"],["mc-sec-profit","利润与投资"],["mc-sec-property","地产"],["mc-sec-fx","汇率与利差"]];
+const MAC_CARDS=["cpi_yoy","ppi_yoy","cpi_ppi_gap","pmi_mfg","m1_yoy","m2_yoy","shrz_yoy","profit_ytd","fai_yoy","re_invest","re_sales","house_t1","cn_us_spread"];
+const MAC_CHARTS=[
+  {id:"cpi",   sec:"inflation",title:"CPI 与 PPI 同比",           sub:"%；月度",keys:["cpi_yoy","ppi_yoy"],type:"line",ov:1},
+  {id:"gap",   sec:"inflation",title:"CPI−PPI 剪刀差",            sub:"个百分点；>0 表示下游价格强于上游（上游成本压力、中下游利润承压）",keys:["cpi_ppi_gap"],type:"bar",ov:1},
+  {id:"pmi",   sec:"growth",   title:"制造业 PMI",                sub:"50 为荣枯线",keys:["pmi_mfg"],type:"line",ov:1,line:50},
+  {id:"m12",   sec:"growth",   title:"M1 与 M2 同比",             sub:"%；M1 回升常领先于股市",keys:["m1_yoy","m2_yoy"],type:"line",ov:1},
+  {id:"m12gap",sec:"growth",   title:"M1−M2 剪刀差",              sub:"个百分点；>0 表示资金活化",keys:["m1_m2_gap"],type:"bar",ov:1},
+  {id:"shrz",  sec:"growth",   title:"社融存量同比",sub:"%；社会融资规模存量的同比增速",keys:["shrz_yoy"],type:"line",ov:1},
+  {id:"profit",sec:"profit",   title:"规模以上工业企业利润同比",  sub:"%；累计同比 与 当月同比",keys:["profit_ytd","profit_m"],type:"line",ov:1},
+  {id:"fai",   sec:"profit",   title:"固定资产投资同比",          sub:"%；当月同比",keys:["fai_yoy"],type:"line",ov:1},
+  {id:"reinv", sec:"property", title:"房地产开发投资 与 商品房销售面积（同比）",sub:"%；累计同比",keys:["re_invest","re_sales"],type:"line",ov:1},
+  {id:"house", sec:"property", title:"一线城市新建商品住宅价格同比",sub:"%；北上广深简单平均",keys:["house_t1"],type:"line",ov:1},
+  {id:"fx",    sec:"fx",       title:"美元兑人民币",              sub:"日度",keys:["usdcnh"],type:"line",scale:1,dp:4},
+  {id:"yld",   sec:"fx",       title:"中美 10 年期国债收益率",    sub:"%；日度",keys:["cn10y","us10y"],type:"line",scale:1},
+  {id:"spread",sec:"fx",       title:"中美 10 年利差（中国−美国）",sub:"个百分点；日度；越负，人民币资产的利差劣势越大",keys:["cn_us_spread"],type:"line",scale:1}
+];
+const MAC_COL=["#d4533a","#2a8bd4","#e0a53b","#3aa86b"];
+let macData=null, macErr="", macRange="10y", macOv=false;
+
+async function selectMacro(){
+  curTop="macro"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
+  renderIndBar(); renderMacroSubBar();
+  document.getElementById("pane").innerHTML='<div class="empty">加载中…</div>';
+  macErr="";
+  try{ macData=await loadCached("macro_api/macro.json"); }
+  catch(e){ macData=null; macErr="宏观数据还没有生成。请到仓库 Actions 页面手动运行一次 macro-daily。"; }
+  renderMacroPane();
+}
+function renderMacroSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  MAC_SECS.forEach(([id,lb])=>{
+    const b=document.createElement("button"); b.className="sub-btn"; b.textContent=lb;
+    b.onclick=()=>{ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); };
+    bar.appendChild(b);
+  });
+}
+function macI(k){ return macData.indicators.find(i=>i.key===k); }
+function macDp(it){ return it.key==="usdcnh"?4:(it.key==="pmi_mfg"?1:2); }
+function macCutoff(dates){                       // 按"该图数据里最新日期"往回推
+  const r=MAC_RANGES.find(x=>x[0]===macRange); if(!r||!r[2]||!dates.length) return "0000-00";
+  const last=dates[dates.length-1], y=+last.slice(0,4)-r[2], m=last.slice(5,7);
+  return String(y).padStart(4,"0")+"-"+m;
+}
+function macPct(it){                             // 最新值在近10年（月度约120点 / 日度约2500点）中的分位
+  const n=it.freq==="D"?2500:120, v=it.values.slice(-n), last=v[v.length-1];
+  return {p:Math.round(v.filter(x=>x<=last).length/v.length*100), yrs:Math.round(v.length/(it.freq==="D"?250:12))};
+}
+function macCard(k){
+  const it=macI(k); if(!it) return "";
+  const hint=it.derived?"":"";
+  if(!it.dates.length){
+    return '<div class="mc-card empty" title="'+esc(it.error||"")+'"><div class="nm">'+esc(it.name)+'</div><div class="val">—</div><div class="sub">暂无数据'+(it.status==="failed"?"（取数失败）":"")+'</div></div>';
+  }
+  const n=it.values.length, v=it.values[n-1], pv=n>1?it.values[n-2]:null, dp=macDp(it), d=pv==null?null:v-pv;
+  const cls=d==null||Math.abs(d)<1e-9?"flat":(d>0?"up":"down");
+  const pc=macPct(it);
+  const unit=it.unit&&it.unit!=="个百分点"?'<span class="u">'+esc(it.unit)+'</span>':"";
+  const tgt={cpi_yoy:"cpi",ppi_yoy:"cpi",cpi_ppi_gap:"gap",pmi_mfg:"pmi",m1_yoy:"m12",m2_yoy:"m12",shrz_yoy:"shrz",profit_ytd:"profit",fai_yoy:"fai",re_invest:"reinv",re_sales:"reinv",house_t1:"house",cn_us_spread:"spread"}[k];
+  return '<div class="mc-card" data-t="'+tgt+'"><div class="nm">'+esc(it.name)+'</div><div class="val">'+v.toFixed(dp)+unit+'</div>'+
+    '<div class="chg '+cls+'">'+(d==null?"—":(d>0?"▲ +":d<0?"▼ ":"")+d.toFixed(dp))+' <span class="sub">较上期</span></div>'+
+    '<div class="sub">数据至 '+esc(it.dates[n-1])+' · 近'+pc.yrs+'年分位 '+pc.p+'%</div></div>';
+}
+function macChartBlock(c){
+  const its=c.keys.map(macI).filter(Boolean), have=its.some(i=>i.dates.length);
+  const notes=its.map(i=>i.note).filter(Boolean);
+  return '<div class="mc-chart" id="mcc-'+c.id+'"><div class="erp-chart-title">'+esc(c.title)+'</div>'+
+    '<div class="erp-chart-sub">'+esc(c.sub||"")+(notes.length?'　<span style="color:#b07a1a">※ '+esc(notes.join("；"))+'</span>':"")+'</div>'+
+    (have?'<div class="erp-chart" id="mc-'+c.id+'" style="height:290px"></div>':'<div class="empty" style="height:120px">暂无数据</div>')+'</div>';
+}
+function renderMacroPane(){
+  const pane=document.getElementById("pane"); etfDispose();
+  if(macErr||!macData){ pane.innerHTML='<div class="empty">'+esc(macErr||"暂无数据")+'</div>'; return; }
+  const gen=(macData.generated_at||"").slice(0,16).replace("T"," ");
+  let h='<div id="mc-top"></div><div class="etf-head"><span class="t">宏观数据</span><span class="chip">通胀 · 景气 · 利润 · 地产 · 汇率</span><span class="upd">更新于 '+esc(gen)+'</span></div>';
+  h+='<div class="mc-bar"><div class="grp"><span class="lab">图表范围</span><div class="ranges" id="macRanges">'+
+     MAC_RANGES.map(([k,l])=>'<span class="rg'+(k===macRange?" on":"")+'" data-r="'+k+'">'+l+'</span>').join("")+'</div></div>'+
+     '<div class="grp"><span class="lab">叠加</span><div class="ranges"><span class="rg'+(macOv?" on":"")+'" id="macOv">沪深300（月末，右轴）</span></div></div></div>';
+  h+='<div class="mc-cards">'+MAC_CARDS.map(macCard).join("")+'</div>';
+  MAC_SECS.slice(1).forEach(([sid,nm])=>{
+    const id=sid.replace("mc-sec-","");
+    h+='<div class="mc-sec" id="'+sid+'">'+esc(nm)+'</div><div class="mc-grid">'+MAC_CHARTS.filter(c=>c.sec===id).map(macChartBlock).join("")+'</div>';
+  });
+  pane.innerHTML=h;
+  pane.querySelectorAll("#macRanges .rg").forEach(el=>el.onclick=()=>{ macRange=el.dataset.r; renderMacroPane(); });
+  document.getElementById("macOv").onclick=()=>{ macOv=!macOv; renderMacroPane(); };
+  pane.querySelectorAll(".mc-card[data-t]").forEach(el=>el.onclick=()=>{ const t=document.getElementById("mcc-"+el.dataset.t); if(t) t.scrollIntoView({behavior:"smooth",block:"center"}); });
+  MAC_CHARTS.forEach(drawMacChart);
+}
+function drawMacChart(c){
+  const el=document.getElementById("mc-"+c.id); if(!el) return;
+  const its=c.keys.map(macI).filter(i=>i&&i.dates.length);
+  const all=[...new Set(its.flatMap(i=>i.dates))].sort();
+  const cut=macCutoff(all), dates=all.filter(d=>d>=cut);
+  const colorOf=i=>MAC_COL[i%MAC_COL.length], dp=c.dp||2;
+  const maps=its.map(i=>{ const m={}; i.dates.forEach((d,j)=>m[d]=i.values[j]); return m; });
+  const series=its.map((it,i)=>{
+    const data=dates.map(d=>maps[i][d]==null?null:maps[i][d]);
+    if(c.type==="bar") return {name:it.name,type:"bar",data:data.map(v=>v==null?null:{value:v,itemStyle:{color:v>=0?"#d4533a":"#3aa86b"}}),
+      markLine:{silent:true,symbol:"none",data:[{yAxis:0}],lineStyle:{color:"#555",width:1},label:{show:false}}};
+    const s={name:it.name,type:"line",showSymbol:false,connectNulls:true,data,lineStyle:{width:1.6},itemStyle:{color:colorOf(i)}};
+    if(i===0&&c.line!=null) s.markLine={silent:true,symbol:"none",data:[{yAxis:c.line}],lineStyle:{type:"dashed",color:"#999"},label:{formatter:"荣枯线 "+c.line,position:"insideEndTop",color:"#888"}};
+    return s;
+  });
+  const yAx=[{type:"value",scale:!!c.scale||c.type!=="bar",splitLine:{lineStyle:{color:"#eee"}},axisLabel:{color:"#888"}}];
+  const monthly=its[0].freq!=="D";
+  if(macOv&&c.ov&&monthly&&macData.hs300.dates.length){
+    const hm={}; macData.hs300.dates.forEach((d,j)=>hm[d]=macData.hs300.values[j]);
+    series.push({name:"沪深300",type:"line",yAxisIndex:1,showSymbol:false,connectNulls:true,data:dates.map(d=>hm[d.slice(0,7)]==null?null:hm[d.slice(0,7)]),
+      lineStyle:{width:1.2,color:"#9aa3ad"},itemStyle:{color:"#9aa3ad"},z:1});
+    yAx.push({type:"value",scale:true,splitLine:{show:false},axisLabel:{color:"#9aa3ad"}});
+  }
+  const ch=echarts.init(el); erpCharts.push(ch);
+  ch.setOption({grid:{left:8,right:macOv&&c.ov&&monthly?16:12,top:34,bottom:44,containLabel:true},
+    legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3,textStyle:{fontSize:12}},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(dp)},
+    xAxis:{type:"category",data:dates,boundaryGap:c.type==="bar",axisLabel:{color:"#888",formatter:v=>v.slice(0,7)},axisLine:{lineStyle:{color:"#ddd"}}},
+    yAxis:yAx,dataZoom:[{type:"inside"},{type:"slider",height:16,bottom:6}],series});
+}
 
 // ================== ETF·两融模块（ETF 总份额变化 + 融资融券；数据：Tushare 每日更新）==================
 const ETF_RANGES=[["3m","近3月"],["6m","近6月"],["1y","近1年"],["all","全部(3年)"]];      // 图表范围：至少保留近3个月
