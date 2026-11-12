@@ -2,7 +2,12 @@ name: macro-daily
 on:
   schedule:
     - cron: '30 10 * * *'     # UTC 10:30 = 北京 18:30（统计局月度数据多在每月 9-15 日 09:30 发布；日度的汇率/利差当天可取）
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: "全量回填统计局历史（约 5 分钟）"
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -18,7 +23,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install akshare tushare pandas six openpyxl
-      - run: python3 macro_ingest.py
+      - run: python3 macro_ingest.py ${{ github.event.inputs.backfill == 'true' && '--backfill' || '' }}
         env:
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
       - run: python3 macro_export.py
