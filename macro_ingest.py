@@ -285,19 +285,29 @@ def nbs_scrape(ctx):
     max_pages = 6 if incremental else 400
     reached = None
     for base in NBS_LISTS:
-        seen_any = False
+        seen_any, fails, last_pg, last_yr = False, 0, -1, None
         for pg in range(0, max_pages):
             url = base + ("" if pg == 0 else f"index_{pg}.html")
-            try:
-                html = http_get(url)
-            except Exception as ex:  # noqa: BLE001
-                if pg == 0:
-                    reached = reached or str(ex)[:100]
-                break
+            html = None
+            for _try in range(3):                       # 单页偶发失败重试，不让一次抖动截断整个回填
+                try:
+                    html = http_get(url)
+                    break
+                except Exception as ex:  # noqa: BLE001
+                    if pg == 0:
+                        reached = reached or str(ex)[:100]
+                    time.sleep(2)
+            if html is None:
+                fails += 1
+                if pg == 0 or fails >= 3:
+                    break
+                continue
+            fails = 0
             items = nbs_list_items(html, url)
             if not items:
                 break
             seen_any = True
+            last_pg, last_yr = pg, min(int(i[2]) for i in items)
             for link, title, yr in items:
                 pt = parse_nbs_title(title)
                 if not pt:
@@ -328,6 +338,8 @@ def nbs_scrape(ctx):
                 break
             time.sleep(0.3)
         if seen_any:
+            print(f"    · 统计局列表 {base} 扫描到第 {last_pg} 页（最后一页最早年份 {last_yr}），"
+                  f"CPI {len(res['cpi_yoy'])} / PPI {len(res['ppi_yoy'])} / 地产 {len(res['re_invest'])} / 利润 {len(res['profit_ytd'])} 条")
             break                                       # 第一个有内容的列表路径即可
     if not any(res.values()) and reached:
         raise RuntimeError(f"统计局列表页不可达：{reached}")
