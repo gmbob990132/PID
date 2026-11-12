@@ -277,72 +277,89 @@ def nbs_list_items(html, url):
     return items
 
 
+def nbs_crawl(base, max_pages):
+    """翻页抓一个列表栏目 → ({文章ID: (链接, 最长标题)}, 扫描页数, 最后一页最早年份, 错误)。404 视为到头。"""
+    arts, last_pg, last_yr, err, fails = {}, -1, None, None, 0
+    for pg in range(0, max_pages):
+        url = base + ("" if pg == 0 else f"index_{pg}.html")
+        html, code = None, None
+        for _try in range(3):                           # 单页偶发失败重试
+            try:
+                html = http_get(url)
+                break
+            except Exception as ex:  # noqa: BLE001
+                code = getattr(ex, "code", None)
+                err = err or str(ex)[:100]
+                if code == 404:
+                    break
+                time.sleep(2)
+        if html is None:
+            if code == 404 or pg == 0:
+                break                                   # 到头 / 首页都不可达
+            fails += 1
+            if fails >= 3:
+                break
+            continue
+        fails = 0
+        items = nbs_list_items(html, url)
+        if not items:
+            break
+        last_pg, last_yr = pg, min(int(i[2]) for i in items)
+        for link, title, yr in items:                   # 同一篇文章在页面里常出现多个锚点（有的标题被截断），取最长标题
+            aid = re.search(r"/(t\d{8}_\d+)\.html", link).group(1)
+            if aid not in arts or len(title) > len(arts[aid][1]):
+                arts[aid] = (link, title)
+        if last_yr < NBS_MIN_YEAR:
+            break
+        time.sleep(0.3)
+    return arts, last_pg, last_yr, err
+
+
 def nbs_scrape(ctx):
     known = ctx.get("known", {})                       # {key: set('YYYY-MM')}，已入库的月份不再抓正文
     res = {k: {} for k in NBS_KEYS}
-    # 已有 ≥24 个月历史才算"增量"，只扫最近 6 页（约半年）；否则全量回填（该栏目约 1.7 页/月，2019 年约 160 页，给到 400 页上限）
+    # 已有 ≥24 个月历史才算"增量"，只扫最近 6 页；否则全量回填。
+    # 两个栏目互补：zxfb2020 约保留最近 2 年（约 50 页）；旧栏目 /sj/zxfb/ 约 67 页，历史更长。
     incremental = all(len(known.get(k, ())) >= 24 for k in ("re_invest", "re_sales", "profit_ytd", "profit_m"))
-    max_pages = 6 if incremental else 400
-    reached = None
+    max_pages = 6 if incremental else 120
+    allarts, errs = {}, []
     for base in NBS_LISTS:
-        seen_any, fails, last_pg, last_yr = False, 0, -1, None
-        for pg in range(0, max_pages):
-            url = base + ("" if pg == 0 else f"index_{pg}.html")
-            html = None
-            for _try in range(3):                       # 单页偶发失败重试，不让一次抖动截断整个回填
-                try:
-                    html = http_get(url)
-                    break
-                except Exception as ex:  # noqa: BLE001
-                    if pg == 0:
-                        reached = reached or str(ex)[:100]
-                    time.sleep(2)
-            if html is None:
-                fails += 1
-                if pg == 0 or fails >= 3:
-                    break
-                continue
-            fails = 0
-            items = nbs_list_items(html, url)
-            if not items:
-                break
-            seen_any = True
-            last_pg, last_yr = pg, min(int(i[2]) for i in items)
-            for link, title, yr in items:
-                pt = parse_nbs_title(title)
-                if not pt:
-                    continue
-                kind, y, mo, val = pt
-                if y < NBS_MIN_YEAR:
-                    continue
-                ym = f"{y:04d}-{mo:02d}"
-                if kind in ("cpi", "ppi"):
-                    res[f"{kind}_yoy"][ym] = val          # 标题即数值，不抓正文
-                    continue
-                keys = ("re_invest", "re_sales") if kind == "property" else ("profit_ytd", "profit_m")
-                if all(ym in known.get(k, ()) for k in keys):
-                    continue
-                try:
-                    body = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", http_get(link)))
-                except Exception:  # noqa: BLE001
-                    continue
-                got = parse_nbs_body(kind, body, mo)
-                if kind == "profit" and "profit_ytd" not in got:           # 标题里也带累计同比
-                    tm = re.search(r"企业利润(增长|下降)([\d.]+)%", title)
-                    if tm:
-                        got["profit_ytd"] = _sgn(tm.group(1), tm.group(2))
-                for k, v in got.items():
-                    res[k][ym] = v
-                time.sleep(0.3)
-            if all(int(i[2]) < NBS_MIN_YEAR for i in items):
-                break
-            time.sleep(0.3)
-        if seen_any:
-            print(f"    · 统计局列表 {base} 扫描到第 {last_pg} 页（最后一页最早年份 {last_yr}），"
-                  f"CPI {len(res['cpi_yoy'])} / PPI {len(res['ppi_yoy'])} / 地产 {len(res['re_invest'])} / 利润 {len(res['profit_ytd'])} 条")
-            break                                       # 第一个有内容的列表路径即可
-    if not any(res.values()) and reached:
-        raise RuntimeError(f"统计局列表页不可达：{reached}")
+        arts, lp, ly, err = nbs_crawl(base, max_pages)
+        print(f"    · 统计局列表 {base}：{len(arts)} 篇，扫到第 {lp} 页（最早年份 {ly}）")
+        if not arts and err:
+            errs.append(err)
+        for aid, v in arts.items():
+            if aid not in allarts or len(v[1]) > len(allarts[aid][1]):
+                allarts[aid] = v if aid not in allarts else (allarts[aid][0], v[1])
+    if not allarts:
+        raise RuntimeError(f"统计局列表页不可达：{(errs or ['无内容'])[0]}")
+    for aid, (link, title) in sorted(allarts.items(), reverse=True):
+        pt = parse_nbs_title(title)
+        if not pt:
+            continue
+        kind, y, mo, val = pt
+        if y < NBS_MIN_YEAR:
+            continue
+        ym = f"{y:04d}-{mo:02d}"
+        if kind in ("cpi", "ppi"):
+            res[f"{kind}_yoy"][ym] = val                  # 标题即数值，不抓正文
+            continue
+        keys = ("re_invest", "re_sales") if kind == "property" else ("profit_ytd", "profit_m")
+        if all(ym in known.get(k, ()) for k in keys):
+            continue
+        try:
+            body = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", http_get(link)))
+        except Exception:  # noqa: BLE001
+            continue
+        got = parse_nbs_body(kind, body, mo)
+        if kind == "profit" and "profit_ytd" not in got:           # 标题里也带累计同比
+            tm = re.search(r"企业利润(增长|下降)([\d.]+)%", title)
+            if tm:
+                got["profit_ytd"] = _sgn(tm.group(1), tm.group(2))
+        for k, v in got.items():
+            res[k][ym] = v
+        time.sleep(0.3)
+    print(f"    · 解析结果：CPI {len(res['cpi_yoy'])} / PPI {len(res['ppi_yoy'])} / 地产投资 {len(res['re_invest'])} / 销售面积 {len(res['re_sales'])} / 利润累计 {len(res['profit_ytd'])} / 利润当月 {len(res['profit_m'])}")
     return res
 
 
