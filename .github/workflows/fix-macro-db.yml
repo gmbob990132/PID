@@ -1,0 +1,31 @@
+name: fix-macro-db
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: macro-daily
+  cancel-in-progress: false
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 fix_macro_db.py
+      - run: pip install pandas
+      - run: python3 macro_export.py
+      - name: 提交
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add data/macro.db macro_api
+          if git diff --cached --quiet; then echo "无变化"; exit 0; fi
+          git commit -m "fix: 清理自检假数据 re_invest 2020-03"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin main && { echo "推送成功"; exit 0; }
+            sleep 10
+          done
+          exit 1
