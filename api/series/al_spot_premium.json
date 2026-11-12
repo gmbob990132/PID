@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-11T07:57:06+00:00",
+  "generated_at": "2026-11-12T08:35:44+00:00",
   "metric": {
     "id": "al_spot_premium",
     "name": "现货升贴水",
@@ -9,18 +9,6 @@
   },
   "range": "recent",
   "points": [
-    {
-      "date": "2026-09-21",
-      "value": 100.0,
-      "change": 120.0,
-      "src_change": null
-    },
-    {
-      "date": "2026-09-22",
-      "value": 30.0,
-      "change": -70.0,
-      "src_change": null
-    },
     {
       "date": "2026-09-23",
       "value": 35.0,
@@ -193,6 +181,18 @@
       "date": "2026-11-10",
       "value": 870.0,
       "change": 505.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-11-11",
+      "value": 210.0,
+      "change": -660.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-11-12",
+      "value": 920.0,
+      "change": 710.0,
       "src_change": null
     }
   ]
