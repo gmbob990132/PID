@@ -6,7 +6,7 @@ on:
     branches: [main]
     paths: ['index.html', 'build_public.sh', '.github/workflows/publish-public.yml']
   workflow_run:
-    workflows: [lv-update, valuation-daily, erp-daily, metals-daily, agri-daily, coal-daily, etf-daily]
+    workflows: [lv-update, valuation-daily, erp-daily, metals-daily, agri-daily, coal-daily, etf-daily, macro-daily]
     types: [completed]
   schedule:
     - cron: '*/30 * * * *'
