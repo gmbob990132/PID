@@ -335,6 +335,7 @@ def nbs_scrape(ctx):
     if not allarts:
         raise RuntimeError(f"统计局列表页不可达：{(errs or ['无内容'])[0]}")
     bad, nfetch = [], 0
+    hits = {"property": [], "profit": []}
     for aid, (link, title) in sorted(allarts.items(), reverse=True):
         pt = parse_nbs_title(title)
         if not pt:
@@ -346,6 +347,7 @@ def nbs_scrape(ctx):
         if kind in ("cpi", "ppi"):
             res[f"{kind}_yoy"][ym] = val                  # 标题即数值，不抓正文
             continue
+        hits[kind].append(ym)
         keys = ("re_invest", "re_sales") if kind == "property" else ("profit_ytd", "profit_m")
         if all(ym in known.get(k, ()) for k in keys):
             continue
@@ -357,9 +359,11 @@ def nbs_scrape(ctx):
         nfetch += 1
         got = parse_nbs_body(kind, body, mo)
         want = 2
-        if len(got) < want and len(bad) < 6:
-            i = max(body.find("房地产开发投资"), body.find("利润总额"), 0)
-            bad.append((title, f"解析到 {sorted(got)}；正文片段：{body[i:i + 90]}"))
+        if len(got) < want and mo != 2 and len(bad) < 6:      # 1—2 月合并发布、无单月数据，不算失败
+            i = body.find("分月看")
+            if i < 0:
+                i = max(body.find(f"{mo}月份，规模"), body.find("房地产开发投资"), 0)
+            bad.append((title, f"解析到 {sorted(got)}；正文片段：{body[i:i + 130]}"))
         if kind == "profit" and "profit_ytd" not in got:           # 标题里也带累计同比
             tm = re.search(r"企业利润(增长|下降)([\d.]+)%", title)
             if tm:
@@ -370,6 +374,8 @@ def nbs_scrape(ctx):
     print(f"    · 抓取正文 {nfetch} 篇，解析不全 {len(bad)} 篇（最多显示 6 条）")
     for t, why in bad[:6]:
         print(f"      - {t[:30]} → {why}")
+    print(f"    · 标题命中：地产 {len(hits['property'])} 篇 {sorted(hits['property'])[:3]}…{sorted(hits['property'])[-2:]}；利润 {len(hits['profit'])} 篇 {sorted(hits['profit'])[:3]}…{sorted(hits['profit'])[-2:]}")
+    res["_hits"] = {"re_invest": len(hits["property"]), "re_sales": len(hits["property"]), "profit_ytd": len(hits["profit"]), "profit_m": len(hits["profit"]), "cpi_yoy": len(res["cpi_yoy"]), "ppi_yoy": len(res["ppi_yoy"])}
     print(f"    · 解析结果：CPI {len(res['cpi_yoy'])} / PPI {len(res['ppi_yoy'])} / 地产投资 {len(res['re_invest'])} / 销售面积 {len(res['re_sales'])} / 利润累计 {len(res['profit_ytd'])} / 利润当月 {len(res['profit_m'])}")
     return res
 
@@ -377,10 +383,11 @@ def nbs_scrape(ctx):
 def ad_nbs_release(ind, ctx):
     if "res" not in _NBS:
         _NBS["res"] = nbs_scrape(ctx)
-    r = _NBS["res"].get(ind["params"]["key"], {})
-    if not r:
-        raise RuntimeError("统计局发布稿解析到 0 行（页面结构可能变了）")
-    return r
+    key = ind["params"]["key"]
+    r = _NBS["res"].get(key, {})
+    if not r and _NBS["res"]["_hits"].get(key, 0) == 0:
+        raise RuntimeError("统计局列表里没有匹配的标题（页面结构可能变了）")
+    return r                                       # 有命中但都已入库 → 本次无新增，不算失败
 
 
 ADAPTERS = {"jin10": ad_jin10, "money_supply": ad_money_supply, "tushare_cn": ad_tushare_cn, "tushare_sf_stock_yoy": ad_tushare_sf_stock_yoy,
