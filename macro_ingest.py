@@ -259,9 +259,15 @@ def parse_nbs_body(kind, text, month):
         m = re.search(r"利润总额[\d.,]+亿元[^同]{0,14}同比(增长|下降)([\d.]+)%", text)
         if m:
             out["profit_ytd"] = _sgn(m.group(1), m.group(2))
-        m = re.search(rf"(?<![—\-\d]){month}月份[，,]规模以上工业企业(?:实现)?利润(?:总额[\d.,]+亿元[，,]?)?(?:同比)?(增长|下降)([\d.]+)%", text)
+        # 单月句式多样："9月份，规模以上工业企业利润同比增长14.4%" / "8月份，…利润同比由上月下降1.5%转为增长20.4%，…"
+        m = re.search(rf"(?<![—\-\d]){month}月份[，,]规模以上工业企业(?:实现)?利润[^。；]*", text)
         if m:
-            out["profit_m"] = _sgn(m.group(1), m.group(2))
+            sent = m.group(0)
+            if "转为" in sent:
+                sent = sent.split("转为", 1)[1]
+            n = re.search(r"(增长|下降)([\d.]+)%", sent)
+            if n:
+                out["profit_m"] = _sgn(n.group(1), n.group(2))
     return out
 
 
@@ -371,6 +377,7 @@ def nbs_scrape(ctx):
         for k, v in got.items():
             res[k][ym] = v
         time.sleep(0.3)
+    print(f"    · 库中已有：" + "，".join(f"{k} {len(v)}" for k, v in known.items()))
     print(f"    · 抓取正文 {nfetch} 篇，解析不全 {len(bad)} 篇（最多显示 6 条）")
     for t, why in bad[:6]:
         print(f"      - {t[:30]} → {why}")
@@ -526,7 +533,7 @@ def selftest():
                   '<a href="./202610/t20261019_3.html">2026年1—9月份全国房地产市场基本情况</a>',
         NBS_LISTS[0] + "index_1.html": '<a href="./202309/t20230915_4.html">2023年1—8月份全国房地产市场基本情况</a>'
                                    '<a href="./201801/t20180120_5.html" title="2018年1—12月份全国房地产市场基本情况">z</a>',
-        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261027_2.html": art("1—9月份，全国规模以上工业企业实现利润总额60337.4亿元，同比增长15.5%（按可比口径计算）。</p><p>9月份，规模以上工业企业利润同比增长14.4%。"),
+        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261027_2.html": art("1—9月份，全国规模以上工业企业实现利润总额60337.4亿元，同比增长15.5%（按可比口径计算）。</p><p>9月份，规模以上工业企业利润同比由上月下降1.5%转为增长14.4%。"),
         "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261019_3.html": art("1—9月份，全国房地产开发投资53364亿元，&nbsp;同比下降20.6%（按可比口径计算）；其中，住宅投资41125亿元，下降20.5%。 1—9月份，新建商品房销售面积56483万平方米，同比下降13.2%；其中住宅销售面积下降13.8%。"),
         "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202309/t20230915_4.html": art("1—8月份，全国房地产开发投资76900亿元，同比下降8.8%。商品房销售面积74000万平方米，同比下降7.1%。"),
     }
