@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>投资数据看板</title>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="vendor/echarts.5.6.0.min.js"></script>
+<script>window.echarts||document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.6.0/dist/echarts.min.js"><\/script>')</script>
 <style>
   :root{
     --navy:#1f3050; --accent:#2a6fdb; --up:#d43f3a; --down:#3a9d3a; --flat:#999;
@@ -188,6 +189,20 @@
   .etf-opt .lab{font-size:12.5px;color:var(--muted);min-width:56px}
   .etf-opt .ranges{margin:0}
 </style>
+<script>
+/* ===== 访问统计（可选）：在下面填入你申请到的统计 ID 即启用，留空则什么都不加载。在对外站点（非 github.io、非本地）生效。
+   cf：Cloudflare Web Analytics 的 token；gc：GoatCounter 站点代码（xxx.goatcounter.com 的 xxx）；baidu：百度统计 hm.js? 后面那串 ID */
+(function(){
+  var CFG={cf:"",gc:"",baidu:""};
+  try{
+    if(/^(localhost|127\.|.*\.github\.io$)/.test(location.hostname)) return;   // 本地和内部版（github.io）不计数，其余域名（workers.dev、自己的域名）都计数
+    function add(src,attrs){var s=document.createElement("script");s.async=true;s.src=src;for(var k in (attrs||{}))s.setAttribute(k,attrs[k]);document.head.appendChild(s);}
+    if(CFG.cf) add("https://static.cloudflareinsights.com/beacon.min.js",{"data-cf-beacon":JSON.stringify({token:CFG.cf})});
+    if(CFG.gc) add("https://gc.zgo.at/count.js",{"data-goatcounter":"https://"+CFG.gc+".goatcounter.com/count"});
+    if(CFG.baidu) add("https://hm.baidu.com/hm.js?"+CFG.baidu);
+  }catch(e){}
+})();
+</script>
 </head>
 <body>
 <header>
@@ -247,20 +262,29 @@ async function boot(){
 function renderIndBar(){
   const bar = document.getElementById("indBar");
   bar.innerHTML = "";
-  const e=document.createElement("button");   // 股权溢价指数放首位
+  // 顺序：指数估值 → 宏观数据 → ETF·两融 → 金属 → 电解铝 → 煤炭 → 农产品 → 技术指标分析（仅内部版）
+  const e=document.createElement("button");
   e.className="ind-btn"+(curTop==="erp"?" on":"");
   e.textContent="指数估值"; e.onclick=()=>selectErp();
   bar.appendChild(e);
-  MODULES.forEach(m=>{                          // 大宗模块（电解铝）其次
+  const mc=document.createElement("button");    // 宏观数据模块
+  mc.className="ind-btn"+(curTop==="macro"?" on":"");
+  mc.textContent="宏观数据"; mc.onclick=()=>selectMacro();
+  bar.appendChild(mc);
+  const ef=document.createElement("button");    // ETF·两融模块
+  ef.className="ind-btn"+(curTop==="etf"?" on":"");
+  ef.textContent="ETF·两融"; ef.onclick=()=>selectEtf();
+  bar.appendChild(ef);
+  const mt=document.createElement("button");    // 金属模块
+  mt.className="ind-btn"+(curTop==="metals"?" on":"");
+  mt.textContent="金属"; mt.onclick=()=>selectMetals();
+  bar.appendChild(mt);
+  MODULES.forEach(m=>{                          // 大宗模块（电解铝）
     const b=document.createElement("button");
     b.className="ind-btn"+(curTop===m.id?" on":"");
     b.textContent=m.name; b.onclick=()=>selectModule(m.id);
     bar.appendChild(b);
   });
-  const mt=document.createElement("button");    // 金属模块
-  mt.className="ind-btn"+(curTop==="metals"?" on":"");
-  mt.textContent="金属"; mt.onclick=()=>selectMetals();
-  bar.appendChild(mt);
   const cl=document.createElement("button");    // 煤炭模块
   cl.className="ind-btn"+(curTop==="coal"?" on":"");
   cl.textContent="煤炭"; cl.onclick=()=>selectCoal();
@@ -273,14 +297,6 @@ function renderIndBar(){
   tc.className="ind-btn"+(curTop==="tech"?" on":"");
   tc.textContent="技术指标分析"; tc.onclick=()=>selectTech();
   bar.appendChild(tc);
-  const ef=document.createElement("button");    // ETF·两融模块
-  ef.className="ind-btn"+(curTop==="etf"?" on":"");
-  ef.textContent="ETF·两融"; ef.onclick=()=>selectEtf();
-  bar.appendChild(ef);
-  const mc=document.createElement("button");    // 宏观数据模块
-  mc.className="ind-btn"+(curTop==="macro"?" on":"");
-  mc.textContent="宏观数据"; mc.onclick=()=>selectMacro();
-  bar.appendChild(mc);
   document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf"||curTop==="macro");
 }
 
