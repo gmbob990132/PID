@@ -8,6 +8,7 @@
   python3 macro_ingest.py              # 取全部
   python3 macro_ingest.py --selftest   # 离线自检（用假 akshare，不联网）
 """
+import html as html_lib
 import os, re, sys, json, time, sqlite3, traceback
 from datetime import datetime, timezone, timedelta
 
@@ -248,17 +249,17 @@ def parse_nbs_title(title):
 def parse_nbs_body(kind, text, month):
     out = {}
     if kind == "property":
-        m = re.search(r"全国房地产开发投资[\d.,]+亿元[，,]\s*同比(增长|下降)([\d.]+)%", text)
+        m = re.search(r"全国房地产开发投资[\d.,]+亿元[^同]{0,14}同比(增长|下降)([\d.]+)%", text)
         if m:
             out["re_invest"] = _sgn(m.group(1), m.group(2))
-        m = re.search(r"商品房销售面积[\d.,]+万平方米[，,]\s*同比(增长|下降)([\d.]+)%", text)
+        m = re.search(r"商品房销售面积[\d.,]+万平方米[^同]{0,14}同比(增长|下降)([\d.]+)%", text)
         if m:
             out["re_sales"] = _sgn(m.group(1), m.group(2))
     else:
-        m = re.search(r"利润总额[\d.,]+亿元[，,]\s*同比(增长|下降)([\d.]+)%", text)
+        m = re.search(r"利润总额[\d.,]+亿元[^同]{0,14}同比(增长|下降)([\d.]+)%", text)
         if m:
             out["profit_ytd"] = _sgn(m.group(1), m.group(2))
-        m = re.search(rf"(?<![—\-\d]){month}月份[，,]\s*规模以上工业企业(?:实现)?利润同比(增长|下降)([\d.]+)%", text)
+        m = re.search(rf"(?<![—\-\d]){month}月份[，,]规模以上工业企业(?:实现)?利润(?:总额[\d.,]+亿元[，,]?)?(?:同比)?(增长|下降)([\d.]+)%", text)
         if m:
             out["profit_m"] = _sgn(m.group(1), m.group(2))
     return out
@@ -320,7 +321,7 @@ def nbs_scrape(ctx):
     res = {k: {} for k in NBS_KEYS}
     # 已有 ≥24 个月历史才算"增量"，只扫最近 6 页；否则全量回填。
     # 两个栏目互补：zxfb2020 约保留最近 2 年（约 50 页）；旧栏目 /sj/zxfb/ 约 67 页，历史更长。
-    incremental = all(len(known.get(k, ())) >= 24 for k in ("re_invest", "re_sales", "profit_ytd", "profit_m"))
+    incremental = "--backfill" not in sys.argv and all(len(known.get(k, ())) >= 24 for k in ("re_invest", "re_sales", "profit_ytd", "profit_m"))
     max_pages = 6 if incremental else 120
     allarts, errs = {}, []
     for base in NBS_LISTS:
@@ -333,6 +334,7 @@ def nbs_scrape(ctx):
                 allarts[aid] = v if aid not in allarts else (allarts[aid][0], v[1])
     if not allarts:
         raise RuntimeError(f"统计局列表页不可达：{(errs or ['无内容'])[0]}")
+    bad, nfetch = [], 0
     for aid, (link, title) in sorted(allarts.items(), reverse=True):
         pt = parse_nbs_title(title)
         if not pt:
@@ -348,10 +350,16 @@ def nbs_scrape(ctx):
         if all(ym in known.get(k, ()) for k in keys):
             continue
         try:
-            body = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", http_get(link)))
+            body = re.sub(r"\s+", "", html_lib.unescape(re.sub(r"<[^>]+>", "", http_get(link))))
         except Exception:  # noqa: BLE001
+            bad.append((title, "正文抓取失败"))
             continue
+        nfetch += 1
         got = parse_nbs_body(kind, body, mo)
+        want = 2
+        if len(got) < want and len(bad) < 6:
+            i = max(body.find("房地产开发投资"), body.find("利润总额"), 0)
+            bad.append((title, f"解析到 {sorted(got)}；正文片段：{body[i:i + 90]}"))
         if kind == "profit" and "profit_ytd" not in got:           # 标题里也带累计同比
             tm = re.search(r"企业利润(增长|下降)([\d.]+)%", title)
             if tm:
@@ -359,6 +367,9 @@ def nbs_scrape(ctx):
         for k, v in got.items():
             res[k][ym] = v
         time.sleep(0.3)
+    print(f"    · 抓取正文 {nfetch} 篇，解析不全 {len(bad)} 篇（最多显示 6 条）")
+    for t, why in bad[:6]:
+        print(f"      - {t[:30]} → {why}")
     print(f"    · 解析结果：CPI {len(res['cpi_yoy'])} / PPI {len(res['ppi_yoy'])} / 地产投资 {len(res['re_invest'])} / 销售面积 {len(res['re_sales'])} / 利润累计 {len(res['profit_ytd'])} / 利润当月 {len(res['profit_m'])}")
     return res
 
@@ -509,7 +520,7 @@ def selftest():
         NBS_LISTS[0] + "index_1.html": '<a href="./202309/t20230915_4.html">2023年1—8月份全国房地产市场基本情况</a>'
                                    '<a href="./201801/t20180120_5.html" title="2018年1—12月份全国房地产市场基本情况">z</a>',
         "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261027_2.html": art("1—9月份，全国规模以上工业企业实现利润总额60337.4亿元，同比增长15.5%（按可比口径计算）。</p><p>9月份，规模以上工业企业利润同比增长14.4%。"),
-        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261019_3.html": art("1—9月份，全国房地产开发投资53364亿元，同比下降20.6%（按可比口径计算）；其中，住宅投资41125亿元，下降20.5%。 1—9月份，新建商品房销售面积56483万平方米，同比下降13.2%；其中住宅销售面积下降13.8%。"),
+        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261019_3.html": art("1—9月份，全国房地产开发投资53364亿元，&nbsp;同比下降20.6%（按可比口径计算）；其中，住宅投资41125亿元，下降20.5%。 1—9月份，新建商品房销售面积56483万平方米，同比下降13.2%；其中住宅销售面积下降13.8%。"),
         "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202309/t20230915_4.html": art("1—8月份，全国房地产开发投资76900亿元，同比下降8.8%。商品房销售面积74000万平方米，同比下降7.1%。"),
     }
 
