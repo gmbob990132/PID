@@ -107,10 +107,56 @@ def ad_new_house(ind, ctx):
 
 
 def ad_usdcnh(ind, ctx):
-    df = get_ak().forex_hist_em(symbol="USDCNH")
-    dcol = find_col(df, "日期") or df.columns[0]
-    vcol = find_col(df, "最新价") or find_col(df, "收盘") or df.columns[2]
-    return pairs_from(df, dcol, vcol, False)
+    """东方财富离岸人民币；容易被限流，失败时退避重试（15s、45s）。"""
+    last = None
+    for wait in (0, 15, 45):
+        if wait:
+            time.sleep(wait)
+        try:
+            df = get_ak().forex_hist_em(symbol="USDCNH")
+            dcol = find_col(df, "日期") or df.columns[0]
+            vcol = find_col(df, "最新价") or find_col(df, "收盘") or df.columns[2]
+            return pairs_from(df, dcol, vcol, False)
+        except Exception as ex:  # noqa: BLE001
+            last = ex
+    raise RuntimeError(str(last)[:100])
+
+
+def ad_tushare_fx(ind, ctx):
+    """Tushare fx_daily（USDCNH.FXCM，取 bid_close）。单次上限 1000 行，按 3 年分段。"""
+    pro = ts_pro()
+    code = ind_param(ind, "ts_code", "USDCNH.FXCM")
+    out, y = {}, 2018
+    end_y = datetime.now(CN_TZ).year
+    while y <= end_y:
+        df = pro.fx_daily(ts_code=code, start_date=f"{y}0101", end_date=f"{min(y + 2, end_y)}1231")
+        if df is not None and len(df):
+            out.update(pairs_from(df, "trade_date", "bid_close", False))
+        y += 3
+    if not out:
+        raise RuntimeError("fx_daily 返回空（可能积分不足）")
+    return out
+
+
+def ind_param(ind, k, default=None):
+    return ind.get("params", {}).get(k, default)
+
+
+def ad_seed_csv(ind, ctx):
+    """人工种子：macro_config/seed_manual.csv（key,date,value），最低优先级，用于一次性回填历史。"""
+    path = os.path.join(HERE, "macro_config", "seed_manual.csv")
+    if not os.path.exists(path):
+        raise RuntimeError("无 seed_manual.csv")
+    out, key = {}, ind["params"]["key"]
+    for line in open(path, encoding="utf-8"):
+        parts = [x.strip() for x in line.strip().split(",")]
+        if len(parts) >= 3 and parts[0] == key:
+            d, v = norm_date(parts[1], True), to_f(parts[2])
+            if d and v is not None:
+                out[d] = v
+    if not out:
+        raise RuntimeError("种子中无此指标")
+    return out
 
 
 _BOND_CACHE = {}
@@ -165,9 +211,11 @@ def ad_gdzctz(ind, ctx):
     return pairs_from(df, find_col(df, "月份") or df.columns[0], find_col(df, "同比") or df.columns[2], True)
 
 
-# ---- 国家统计局发布稿解析（房地产开发投资 / 商品房销售面积 / 工业企业利润）----
-NBS_LIST = "https://www.stats.gov.cn/sj/zxfb/"
+# ---- 国家统计局发布稿解析（房地产 / 工业利润 / CPI·PPI 最新月）----
+# 文章实际路径在 /xxgk/sjfb/zxfb2020/；旧的 /sj/zxfb/ 作为备用。两处都试，谁有内容用谁。
+NBS_LISTS = ["https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/", "https://www.stats.gov.cn/sj/zxfb/"]
 NBS_MIN_YEAR = 2019
+NBS_KEYS = ("re_invest", "re_sales", "profit_ytd", "profit_m", "cpi_yoy", "ppi_yoy")
 _NBS = {}
 
 
@@ -182,13 +230,18 @@ def _sgn(word, num):
 
 
 def parse_nbs_title(title):
-    """→ (kind, year, month) 或 None。kind: 'property' | 'profit'。"""
+    """→ (kind, year, month, value|None)。kind: property | profit | cpi | ppi。CPI/PPI 标题自带数值。"""
     m = re.search(r"(\d{4})年1[—\-–](\d{1,2})月份全国房地产市场基本情况", title)
     if m:
-        return "property", int(m.group(1)), int(m.group(2))
+        return "property", int(m.group(1)), int(m.group(2)), None
     m = re.search(r"(\d{4})年1[—\-–](\d{1,2})月份全国规模以上工业企业利润", title)
     if m:
-        return "profit", int(m.group(1)), int(m.group(2))
+        return "profit", int(m.group(1)), int(m.group(2)), None
+    for kind, pat in (("cpi", "居民消费价格"), ("ppi", "工业生产者出厂价格")):
+        m = re.search(rf"(\d{{4}})年(\d{{1,2}})月份{pat}同比(上涨|下降|持平)([\d.]*)", title)
+        if m:
+            v = 0.0 if m.group(3) == "持平" or not m.group(4) else _sgn(m.group(3), m.group(4))
+            return kind, int(m.group(1)), int(m.group(2)), v
     return None
 
 
@@ -211,59 +264,72 @@ def parse_nbs_body(kind, text, month):
     return out
 
 
+def nbs_list_items(html, url):
+    from urllib.parse import urljoin
+    items = []
+    for m in re.finditer(r"<a\b([^>]*)>(.*?)</a>", html, re.S):
+        attrs, inner = m.group(1), re.sub(r"<[^>]+>", "", m.group(2))
+        h = re.search(r'href="([^"]+)"', attrs)
+        if not h or not re.search(r"/t(\d{8})_\d+\.html", h.group(1)):
+            continue
+        t = re.search(r'title="([^"]+)"', attrs)
+        items.append((urljoin(url, h.group(1)), (t.group(1) if t else inner).strip(), re.search(r"/t(\d{4})\d{4}_", h.group(1)).group(1)))
+    return items
+
+
 def nbs_scrape(ctx):
     known = ctx.get("known", {})                       # {key: set('YYYY-MM')}，已入库的月份不再抓正文
-    res = {k: {} for k in ("re_invest", "re_sales", "profit_ytd", "profit_m")}
-    incremental = any(known.get(k) for k in res)
-    for pg in range(0, 160):
-        url = NBS_LIST + ("" if pg == 0 else f"index_{pg}.html")
-        try:
-            html = http_get(url)
-        except Exception as ex:  # noqa: BLE001
-            if pg == 0:
-                raise RuntimeError(f"统计局列表页不可达：{str(ex)[:100]}")
-            break
-        from urllib.parse import urljoin
-        items = []
-        for m in re.finditer(r"<a\b([^>]*)>(.*?)</a>", html, re.S):
-            attrs, inner = m.group(1), re.sub(r"<[^>]+>", "", m.group(2))
-            h = re.search(r'href="([^"]+)"', attrs)
-            if not h or not re.search(r"/t(\d{8})_\d+\.html", h.group(1)):
-                continue
-            t = re.search(r'title="([^"]+)"', attrs)
-            items.append((urljoin(url, h.group(1)), (t.group(1) if t else inner).strip(), re.search(r"/t(\d{4})\d{4}_", h.group(1)).group(1)))
-        if not items:
-            break
-        fetched = 0
-        for link, title, yr in items:
-            pt = parse_nbs_title(title)
-            if not pt:
-                continue
-            kind, y, mo = pt
-            if y < NBS_MIN_YEAR:
-                continue
-            ym = f"{y:04d}-{mo:02d}"
-            keys = ("re_invest", "re_sales") if kind == "property" else ("profit_ytd", "profit_m")
-            if all(ym in known.get(k, ()) for k in keys):
-                continue
+    res = {k: {} for k in NBS_KEYS}
+    incremental = any(known.get(k) for k in ("re_invest", "re_sales", "profit_ytd", "profit_m"))
+    max_pages = 6 if incremental else 160
+    reached = None
+    for base in NBS_LISTS:
+        seen_any = False
+        for pg in range(0, max_pages):
+            url = base + ("" if pg == 0 else f"index_{pg}.html")
             try:
-                body = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", http_get(link)))
-            except Exception:  # noqa: BLE001
-                continue
-            got = parse_nbs_body(kind, body, mo)
-            if kind == "profit" and "profit_ytd" not in got:           # 标题里也带累计同比
-                tm = re.search(r"企业利润(增长|下降)([\d.]+)%", title)
-                if tm:
-                    got["profit_ytd"] = _sgn(tm.group(1), tm.group(2))
-            for k, v in got.items():
-                res[k][ym] = v
-            fetched += 1
+                html = http_get(url)
+            except Exception as ex:  # noqa: BLE001
+                if pg == 0:
+                    reached = reached or str(ex)[:100]
+                break
+            items = nbs_list_items(html, url)
+            if not items:
+                break
+            seen_any = True
+            for link, title, yr in items:
+                pt = parse_nbs_title(title)
+                if not pt:
+                    continue
+                kind, y, mo, val = pt
+                if y < NBS_MIN_YEAR:
+                    continue
+                ym = f"{y:04d}-{mo:02d}"
+                if kind in ("cpi", "ppi"):
+                    res[f"{kind}_yoy"][ym] = val          # 标题即数值，不抓正文
+                    continue
+                keys = ("re_invest", "re_sales") if kind == "property" else ("profit_ytd", "profit_m")
+                if all(ym in known.get(k, ()) for k in keys):
+                    continue
+                try:
+                    body = re.sub(r"\s+", "", re.sub(r"<[^>]+>", "", http_get(link)))
+                except Exception:  # noqa: BLE001
+                    continue
+                got = parse_nbs_body(kind, body, mo)
+                if kind == "profit" and "profit_ytd" not in got:           # 标题里也带累计同比
+                    tm = re.search(r"企业利润(增长|下降)([\d.]+)%", title)
+                    if tm:
+                        got["profit_ytd"] = _sgn(tm.group(1), tm.group(2))
+                for k, v in got.items():
+                    res[k][ym] = v
+                time.sleep(0.3)
+            if all(int(i[2]) < NBS_MIN_YEAR for i in items):
+                break
             time.sleep(0.3)
-        if all(int(i[2]) < NBS_MIN_YEAR for i in items):
-            break
-        if incremental and fetched == 0 and pg >= 2 and not any(parse_nbs_title(t) and (parse_nbs_title(t)[1] >= datetime.now(CN_TZ).year - 1) for _, t, _ in items):
-            break
-        time.sleep(0.3)
+        if seen_any:
+            break                                       # 第一个有内容的列表路径即可
+    if not any(res.values()) and reached:
+        raise RuntimeError(f"统计局列表页不可达：{reached}")
     return res
 
 
@@ -277,7 +343,7 @@ def ad_nbs_release(ind, ctx):
 
 
 ADAPTERS = {"jin10": ad_jin10, "money_supply": ad_money_supply, "tushare_cn": ad_tushare_cn, "tushare_sf_stock_yoy": ad_tushare_sf_stock_yoy,
-            "gdzctz": ad_gdzctz, "nbs_release": ad_nbs_release, "new_house": ad_new_house, "usdcnh": ad_usdcnh, "bond_us_cn": ad_bond_us_cn}
+            "gdzctz": ad_gdzctz, "nbs_release": ad_nbs_release, "tushare_fx": ad_tushare_fx, "seed_csv": ad_seed_csv, "new_house": ad_new_house, "usdcnh": ad_usdcnh, "bond_us_cn": ad_bond_us_cn}
 
 
 # ---------- 沪深300 月末收盘（叠加用）----------
@@ -397,6 +463,7 @@ def selftest():
         def cn_pmi(self, start_m, end_m): return pd.DataFrame({"month": yms[-24:], "pmi010000": [50.2] * 24})
         def cn_m(self, start_m, end_m): return pd.DataFrame({"month": yms[-24:], "m1_yoy": [3.2] * 24, "m2_yoy": [7.2] * 24})
         def sf_month(self, start_m, end_m): return pd.DataFrame({"month": yms[::-1], "inc_month": 1.0, "inc_cumval": 1.0, "stk_endval": [400.0 + i for i in range(len(yms))][::-1]})
+        def fx_daily(self, ts_code, start_date, end_date): return pd.DataFrame({"trade_date": ["20260210", "20261104"], "bid_close": [7.0, 7.11]})
         def index_daily(self, ts_code, start_date, end_date, fields=None):
             return pd.DataFrame({"trade_date": ["20260930", "20261030"], "close": [4600.0, 4700.0]})
     tsm = types.ModuleType("tushare"); tsm.pro_api = lambda tok: FakePro(); sys.modules["tushare"] = tsm
@@ -404,14 +471,16 @@ def selftest():
 
     def art(txt): return "<html><body><p>" + txt + "</p></body></html>"
     pages = {
-        NBS_LIST: '<a href="./202611/t20261103_1.html" title="2026年10月下旬流通领域重要生产资料市场价格变动情况">x</a>'
+        NBS_LISTS[0]: '<a href="./202611/t20261109_9.html" title="2026年10月份居民消费价格同比上涨0.7%">c</a>'
+                  '<a href="./202611/t20261109_8.html" title="2026年10月份工业生产者出厂价格同比上涨5.7%">p</a>'
+                  '<a href="./202611/t20261103_1.html" title="2026年10月下旬流通领域重要生产资料市场价格变动情况">x</a>'
                   '<a href="./202610/t20261027_2.html" title="2026年1—9月份全国规模以上工业企业利润增长15.5%">y</a>'
                   '<a href="./202610/t20261019_3.html">2026年1—9月份全国房地产市场基本情况</a>',
-        NBS_LIST + "index_1.html": '<a href="./202309/t20230915_4.html">2023年1—8月份全国房地产市场基本情况</a>'
+        NBS_LISTS[0] + "index_1.html": '<a href="./202309/t20230915_4.html">2023年1—8月份全国房地产市场基本情况</a>'
                                    '<a href="./201801/t20180120_5.html" title="2018年1—12月份全国房地产市场基本情况">z</a>',
-        "https://www.stats.gov.cn/sj/zxfb/202610/t20261027_2.html": art("1—9月份，全国规模以上工业企业实现利润总额60337.4亿元，同比增长15.5%（按可比口径计算）。</p><p>9月份，规模以上工业企业利润同比增长14.4%。"),
-        "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_3.html": art("1—9月份，全国房地产开发投资53364亿元，同比下降20.6%（按可比口径计算）；其中，住宅投资41125亿元，下降20.5%。 1—9月份，新建商品房销售面积56483万平方米，同比下降13.2%；其中住宅销售面积下降13.8%。"),
-        "https://www.stats.gov.cn/sj/zxfb/202309/t20230915_4.html": art("1—8月份，全国房地产开发投资76900亿元，同比下降8.8%。商品房销售面积74000万平方米，同比下降7.1%。"),
+        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261027_2.html": art("1—9月份，全国规模以上工业企业实现利润总额60337.4亿元，同比增长15.5%（按可比口径计算）。</p><p>9月份，规模以上工业企业利润同比增长14.4%。"),
+        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202610/t20261019_3.html": art("1—9月份，全国房地产开发投资53364亿元，同比下降20.6%（按可比口径计算）；其中，住宅投资41125亿元，下降20.5%。 1—9月份，新建商品房销售面积56483万平方米，同比下降13.2%；其中住宅销售面积下降13.8%。"),
+        "https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202309/t20230915_4.html": art("1—8月份，全国房地产开发投资76900亿元，同比下降8.8%。商品房销售面积74000万平方米，同比下降7.1%。"),
     }
 
     def fake_http(url, timeout=30):
@@ -432,8 +501,12 @@ def selftest():
     assert q("SELECT value FROM macro_series WHERE key='re_invest' AND date='2023-08'") == -8.8
     assert q("SELECT value FROM macro_series WHERE key='profit_ytd' AND date='2026-09'") == 15.5
     assert q("SELECT value FROM macro_series WHERE key='profit_m' AND date='2026-09'") == 14.4
-    assert q("SELECT COUNT(*) FROM macro_series WHERE key='re_invest'") == 2                                  # 2018 年的被 NBS_MIN_YEAR 过滤
+    assert q("SELECT COUNT(*) FROM macro_series WHERE key='re_invest'") == 3                                  # 2018 年的被 NBS_MIN_YEAR 过滤
     assert q("SELECT COUNT(*) FROM macro_series WHERE key='cn10y'") == 1                                      # NaN 被丢弃
+    assert q("SELECT value FROM macro_series WHERE key='cpi_yoy' AND date='2026-10'") == 0.7                  # 统计局标题补最新月
+    assert q("SELECT value FROM macro_series WHERE key='ppi_yoy' AND date='2026-10'") == 5.7
+    assert q("SELECT COUNT(*) FROM macro_series WHERE key='usdcnh'") >= 3                                    # 东财 + Tushare 合并
+    assert q("SELECT value FROM macro_series WHERE key='re_invest' AND date='2020-03'") == -7.7              # 种子回填
     assert q("SELECT COUNT(*) FROM macro_log WHERE status='failed'") == 0
     print("selftest OK")
 
