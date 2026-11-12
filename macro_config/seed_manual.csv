@@ -1,0 +1,7 @@
+# key,date,value   —— 人工种子，最低优先级；抓取到的数据会覆盖同月份
+# key 取值：re_invest 房地产开发投资累计同比 / re_sales 商品房销售面积累计同比 / profit_ytd 工业利润累计同比 / profit_m 工业利润当月同比
+re_invest,2026-09,-20.6
+re_sales,2026-09,-13.2
+profit_ytd,2026-09,15.5
+profit_m,2026-09,14.4
+re_invest,2020-03,-7.7

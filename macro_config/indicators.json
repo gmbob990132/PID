@@ -42,6 +42,12 @@
             "fn": "cn_cpi",
             "col": "nt_yoy"
           }
+        },
+        {
+          "adapter": "nbs_release",
+          "params": {
+            "key": "cpi_yoy"
+          }
         }
       ]
     },
@@ -63,6 +69,12 @@
           "params": {
             "fn": "cn_ppi",
             "col": "ppi_yoy"
+          }
+        },
+        {
+          "adapter": "nbs_release",
+          "params": {
+            "key": "ppi_yoy"
           }
         }
       ]
@@ -154,6 +166,12 @@
       "group": "profit",
       "sources": [
         {
+          "adapter": "seed_csv",
+          "params": {
+            "key": "profit_ytd"
+          }
+        },
+        {
           "adapter": "nbs_release",
           "params": {
             "key": "profit_ytd"
@@ -169,6 +187,12 @@
       "freq": "M",
       "group": "profit",
       "sources": [
+        {
+          "adapter": "seed_csv",
+          "params": {
+            "key": "profit_m"
+          }
+        },
         {
           "adapter": "nbs_release",
           "params": {
@@ -198,6 +222,12 @@
       "group": "property",
       "sources": [
         {
+          "adapter": "seed_csv",
+          "params": {
+            "key": "re_invest"
+          }
+        },
+        {
           "adapter": "nbs_release",
           "params": {
             "key": "re_invest"
@@ -213,6 +243,12 @@
       "freq": "M",
       "group": "property",
       "sources": [
+        {
+          "adapter": "seed_csv",
+          "params": {
+            "key": "re_sales"
+          }
+        },
         {
           "adapter": "nbs_release",
           "params": {
@@ -251,6 +287,12 @@
       "freq": "D",
       "group": "fx",
       "sources": [
+        {
+          "adapter": "tushare_fx",
+          "params": {
+            "ts_code": "USDCNH.FXCM"
+          }
+        },
         {
           "adapter": "usdcnh"
         }
