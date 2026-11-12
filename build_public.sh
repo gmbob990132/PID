@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 rm -rf dist && mkdir dist
 cp index.html dist/
+[ -d vendor ] && cp -r vendor dist/
 for d in api valuation_api erp_api metals_api agri_api coal_api etf_api macro_api; do
   [ -d "$d" ] && cp -r "$d" dist/
 done
