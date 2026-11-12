@@ -280,8 +280,9 @@ def nbs_list_items(html, url):
 def nbs_scrape(ctx):
     known = ctx.get("known", {})                       # {key: set('YYYY-MM')}，已入库的月份不再抓正文
     res = {k: {} for k in NBS_KEYS}
-    incremental = any(known.get(k) for k in ("re_invest", "re_sales", "profit_ytd", "profit_m"))
-    max_pages = 6 if incremental else 160
+    # 已有 ≥24 个月历史才算"增量"，只扫最近 6 页（约半年）；否则全量回填（该栏目约 1.7 页/月，2019 年约 160 页，给到 400 页上限）
+    incremental = all(len(known.get(k, ())) >= 24 for k in ("re_invest", "re_sales", "profit_ytd", "profit_m"))
+    max_pages = 6 if incremental else 400
     reached = None
     for base in NBS_LISTS:
         seen_any = False
