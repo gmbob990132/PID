@@ -39,8 +39,8 @@ _QHD = ["5500大卡", "5000大卡", "4500大卡"]
 # layout: pairs = 每个热值两列（价格, 环比增减）；single = 价格, 环比增减[, 环比%]
 BLOCKS = [
     dict(id="qhd_zh", grp="qhd", title="综合交易价", data="CCTD秦皇岛动力煤价格", name="CCTD秦皇岛动力煤价格", layout="pairs", labels=_QHD, unit="元/吨"),
-    dict(id="qhd_lx", grp="qhd", title="年度长协价", data="CCTD秦皇岛长协价格", name="CCTD秦皇岛长协价格", layout="pairs", labels=_QHD, unit="元/吨"),
     dict(id="qhd_xh", grp="qhd", title="现货交易价", data="CCTD秦皇岛现货交易", name="CCTD秦皇岛现货交易", layout="pairs", labels=_QHD, unit="元/吨"),
+    dict(id="qhd_lx", grp="qhd", title="年度长协价", data="CCTD秦皇岛长协价格", name="CCTD秦皇岛长协价格", layout="pairs", labels=_QHD, unit="元/吨"),
     dict(id="or_sx", grp="origin", title="山西", data="CCTD山西价格指数", name="CCTD价格指数", layout="single", labels=["价格指数"], unit="元/吨"),
     dict(id="or_sn", grp="origin", title="陕西", data="CCTD陕西价格指数", name="CCTD价格指数", layout="single", labels=["价格指数"], unit="元/吨"),
     dict(id="or_mx", grp="origin", title="蒙西", data="CCTD蒙西价格指数", name="CCTD价格指数", layout="single", labels=["价格指数"], unit="元/吨"),
