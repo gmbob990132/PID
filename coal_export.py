@@ -31,10 +31,10 @@ def _minus_year(d):
 def _freq(dates):
     if len(dates) < 2:
         return "—", 7
-    recent = dates[-13:]                       # 只看最近 12 个间隔：老数据可能更密（日度），不能拖累现在的判断
+    recent = dates[-7:]                        # 只看最近 6 个间隔：老数据可能更密（日度），不能拖累现在的判断
     gaps = [(_d(b) - _d(a)).days for a, b in zip(recent, recent[1:])]
     g = statistics.median(gaps)
-    return ("周度" if g <= 10 else "月度" if g <= 40 else "低频"), g
+    return ("日度" if g <= 4 else "周度" if g <= 10 else "月度" if g <= 40 else "低频"), g
 
 
 def stats(points, site_delta_last):
@@ -84,7 +84,7 @@ def export(db_path, out_dir):
     failed = [{"item": i, "message": m} for (t, i, s, m) in runs if s == "failed" and t == last_run]
     earliest = min((s["points"][0][0] for g in groups for b in g["blocks"] for s in b["series"]), default=None)
     latest_all = max((s["latest"]["date"] for g in groups for b in g["blocks"] for s in b["series"]), default=None)
-    out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "source": "CCTD 中国煤炭市场网",
+    out = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "source": "CCTD 中国煤炭市场网；焦煤/焦炭为大商所期货主力连续合约",
            "since": earliest, "latest": latest_all, "last_run": last_run, "failed": failed, "groups": groups}
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "coal.json"), "w", encoding="utf-8") as f:
@@ -124,7 +124,11 @@ def _selftest():
     out = export(db, tmp)
     j = json.load(open(os.path.join(tmp, "coal.json"), encoding="utf-8"))
     assert j["groups"][0]["blocks"][0]["series"][0]["yoy"]["ref_date"] == "2025-10-17" and j["latest"] == "2026-10-16"
-    assert [g["key"] for g in j["groups"]] == ["qhd", "origin", "hl"] and j["groups"][1]["blocks"] == []
+    assert [g["key"] for g in j["groups"]] == ["qhd", "gz", "origin", "hl", "fut"] and j["groups"][1]["blocks"] == []
+    dl = [(f"2026-11-{d:02d}", 1400 + d) for d in (2, 3, 4, 5, 6, 9, 10, 11, 12)] + [("2025-11-12", 1200)]
+    dl.sort()
+    l, m, y, f = stats(dl, None)
+    assert f == "日度" and m["ref_date"] == "2026-11-11" and y and y["ref_date"] == "2025-11-12", (f, m, y)
     print("selftest OK")
 
 

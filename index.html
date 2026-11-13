@@ -1359,7 +1359,7 @@ function renderMarginPane(pane){
 }
 
 // ================== 煤炭模块（CCTD 中国煤炭市场网：秦皇岛 / 产地指数 / 黄陵气煤；每日检查更新）==================
-const COAL_SUBS=[["qhd","秦皇岛动力煤"],["origin","产地动力煤"],["hl","延安（黄陵）气煤"]];
+const COAL_SUBS=[["qhd","秦皇岛动力煤"],["gz","广州港进口煤"],["origin","产地动力煤"],["hl","延安（黄陵）气煤"],["fut","焦煤·焦炭期货"]];
 let coalData=null, coalErr="", coalSub="qhd", coalSel={};          // coalSel[块id] = 当前选中的序列下标（决定下方图表画哪条）
 
 async function selectCoal(){
