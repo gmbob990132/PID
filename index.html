@@ -193,7 +193,7 @@
 /* ===== 访问统计（可选）：在下面填入你申请到的统计 ID 即启用，留空则什么都不加载。在对外站点（非 github.io、非本地）生效。
    cf：Cloudflare Web Analytics 的 token；gc：GoatCounter 站点代码（xxx.goatcounter.com 的 xxx）；baidu：百度统计 hm.js? 后面那串 ID */
 (function(){
-  var CFG={cf:"",gc:"",baidu:""};
+  var CFG={cf:"",gc:"",baidu:"bfa54338d280dd15cdd25a0134fd7a7d"};
   try{
     if(/^(localhost|127\.|.*\.github\.io$)/.test(location.hostname)) return;   // 本地和内部版（github.io）不计数，其余域名（workers.dev、自己的域名）都计数
     function add(src,attrs){var s=document.createElement("script");s.async=true;s.src=src;for(var k in (attrs||{}))s.setAttribute(k,attrs[k]);document.head.appendChild(s);}
