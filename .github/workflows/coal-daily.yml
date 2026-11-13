@@ -17,7 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python3 coal_ingest.py          # 纯标准库，不需要 pip 安装、不需要 Secret
+      - run: pip install akshare --quiet || echo "akshare 安装失败：只影响焦煤/焦炭期货，CCTD 各块照常"
+      - run: python3 coal_ingest.py          # CCTD 部分纯标准库；期货部分用 akshare；不需要 Secret
       - run: python3 coal_export.py
       - name: 提交数据（同步远端 + 重试，容忍并发与偶发错误）
         run: |
