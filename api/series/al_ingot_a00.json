@@ -1,0 +1,199 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-11-14T07:46:30+00:00",
+  "metric": {
+    "id": "al_ingot_a00",
+    "name": "A00铝锭",
+    "category": "price",
+    "unit": "元/吨"
+  },
+  "range": "recent",
+  "points": [
+    {
+      "date": "2026-09-24",
+      "value": 24240.0,
+      "change": 0.0,
+      "src_change": 0.0
+    },
+    {
+      "date": "2026-09-28",
+      "value": 24170.0,
+      "change": -70.0,
+      "src_change": -70.0
+    },
+    {
+      "date": "2026-09-29",
+      "value": 24110.0,
+      "change": -60.0,
+      "src_change": -60.0
+    },
+    {
+      "date": "2026-09-30",
+      "value": 24030.0,
+      "change": -80.0,
+      "src_change": -80.0
+    },
+    {
+      "date": "2026-10-08",
+      "value": 23760.0,
+      "change": -270.0,
+      "src_change": -270.0
+    },
+    {
+      "date": "2026-10-09",
+      "value": 23660.0,
+      "change": -100.0,
+      "src_change": -100.0
+    },
+    {
+      "date": "2026-10-12",
+      "value": 23810.0,
+      "change": 150.0,
+      "src_change": 150.0
+    },
+    {
+      "date": "2026-10-13",
+      "value": 23670.0,
+      "change": -140.0,
+      "src_change": -140.0
+    },
+    {
+      "date": "2026-10-14",
+      "value": 23620.0,
+      "change": -50.0,
+      "src_change": -50.0
+    },
+    {
+      "date": "2026-10-15",
+      "value": 23270.0,
+      "change": -350.0,
+      "src_change": -350.0
+    },
+    {
+      "date": "2026-10-16",
+      "value": 23460.0,
+      "change": 190.0,
+      "src_change": 190.0
+    },
+    {
+      "date": "2026-10-19",
+      "value": 23650.0,
+      "change": 190.0,
+      "src_change": 190.0
+    },
+    {
+      "date": "2026-10-20",
+      "value": 23530.0,
+      "change": -120.0,
+      "src_change": -120.0
+    },
+    {
+      "date": "2026-10-21",
+      "value": 23610.0,
+      "change": 80.0,
+      "src_change": 80.0
+    },
+    {
+      "date": "2026-10-22",
+      "value": 23700.0,
+      "change": 90.0,
+      "src_change": 90.0
+    },
+    {
+      "date": "2026-10-23",
+      "value": 23660.0,
+      "change": -40.0,
+      "src_change": -40.0
+    },
+    {
+      "date": "2026-10-26",
+      "value": 23960.0,
+      "change": 300.0,
+      "src_change": 300.0
+    },
+    {
+      "date": "2026-10-27",
+      "value": 23880.0,
+      "change": -80.0,
+      "src_change": -80.0
+    },
+    {
+      "date": "2026-10-28",
+      "value": 23920.0,
+      "change": 40.0,
+      "src_change": 40.0
+    },
+    {
+      "date": "2026-10-29",
+      "value": 23740.0,
+      "change": -180.0,
+      "src_change": -180.0
+    },
+    {
+      "date": "2026-10-30",
+      "value": 23780.0,
+      "change": 40.0,
+      "src_change": 40.0
+    },
+    {
+      "date": "2026-11-02",
+      "value": 23510.0,
+      "change": -270.0,
+      "src_change": -270.0
+    },
+    {
+      "date": "2026-11-03",
+      "value": 23440.0,
+      "change": -70.0,
+      "src_change": -70.0
+    },
+    {
+      "date": "2026-11-04",
+      "value": 23340.0,
+      "change": -100.0,
+      "src_change": -100.0
+    },
+    {
+      "date": "2026-11-05",
+      "value": 23370.0,
+      "change": 30.0,
+      "src_change": 30.0
+    },
+    {
+      "date": "2026-11-06",
+      "value": 23330.0,
+      "change": -40.0,
+      "src_change": -40.0
+    },
+    {
+      "date": "2026-11-09",
+      "value": 23550.0,
+      "change": 220.0,
+      "src_change": 220.0
+    },
+    {
+      "date": "2026-11-10",
+      "value": 23300.0,
+      "change": -250.0,
+      "src_change": -250.0
+    },
+    {
+      "date": "2026-11-11",
+      "value": 22700.0,
+      "change": -600.0,
+      "src_change": -600.0
+    },
+    {
+      "date": "2026-11-12",
+      "value": 23120.0,
+      "change": 420.0,
+      "src_change": 420.0
+    },
+    {
+      "date": "2026-11-13",
+      "value": 23130.0,
+      "change": 10.0,
+      "src_change": 10.0
+    }
+  ]
+}
