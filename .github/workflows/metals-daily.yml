@@ -14,7 +14,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install akshare
-      - run: python3 metals_ingest.py
+      - name: 取数（个别来源失败只告警，其余数据照常导出提交）
+        run: python3 metals_ingest.py || echo "::warning::metals_ingest 有来源失败，详见上方日志"
       - run: python3 metals_export.py
       - name: 提交数据（无变化则跳过）
         run: |
