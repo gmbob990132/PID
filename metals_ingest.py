@@ -6,8 +6,9 @@
 数据源（均已探路验证 GitHub 境外可取）：
   akshare futures_main_sina : 沪金 AU0 / 沪铜 CU0 / 碳酸锂 LC0（收盘价）
   akshare spot_hist_sge     : 上海金 Au99.99（close）
-  akshare futures_foreign_hist: COMEX金 GC / LME铜 CAD（外盘 close）
-  akshare macro_euro_lme_stock: LME 铜库存（宽表'铜-库存'列，吨→万吨）
+  akshare futures_foreign_hist_sina（1.20.46 前叫 futures_foreign_hist）: COMEX金 GC / LME铜 CAD（外盘 close）
+  LME 铜库存：原接口 macro_euro_lme_stock 的数据 2026-07-17 起停更，akshare 1.20.48 已删除该接口；
+              这里改为 frozen（不再取数，只保留历史），页面上标"已停更"
   Mysteel li.mysteel.com    : 碳酸锂现货三品级（静态表，取中间价 t9 price；全字段都存）
 
 用法：
@@ -41,7 +42,7 @@ METRICS = [
     # 铜
     {"id": "cu_shfe",  "name": "沪铜",          "unit": "元/吨",     "group": "copper", "src": "ak_futures_main",  "params": {"symbol": "CU0"}},
     {"id": "cu_lme",   "name": "LME铜",         "unit": "美元/吨",   "group": "copper", "src": "ak_foreign",       "params": {"symbol": "CAD"}},
-    {"id": "cu_lme_inv","name": "LME铜库存",    "unit": "万吨",      "group": "copper", "src": "ak_lme_stock",     "params": {"metal": "铜"}, "hide_chart": True},
+    {"id": "cu_lme_inv","name": "LME铜库存（已停更）", "unit": "万吨", "group": "copper", "src": "frozen",     "params": {"metal": "铜"}, "hide_chart": True},
     # 锂
     {"id": "lc_futures","name": "碳酸锂期货",   "unit": "元/吨",     "group": "lithium","src": "ak_futures_main",  "params": {"symbol": "LC0"}},
 ]
@@ -104,7 +105,8 @@ def ad_ak_foreign(metrics, start_d):
     import akshare as ak
     out = []
     for m in metrics:
-        df = ak.futures_foreign_hist(symbol=m["params"]["symbol"])
+        fn = getattr(ak, "futures_foreign_hist_sina", None) or getattr(ak, "futures_foreign_hist")
+        df = fn(symbol=m["params"]["symbol"])
         for _, r in df.iterrows():
             v = _clean_num(r.get("close"))
             d = str(r.get("date"))[:10]
@@ -180,6 +182,7 @@ ADAPTERS = {
     "ak_spot_sge": ad_ak_spot_sge,
     "ak_foreign": ad_ak_foreign,
     "ak_lme_stock": ad_ak_lme_stock,
+    "frozen": lambda metrics, start_d: [],      # 数据源已停更：不取数，保留库里历史
     "mysteel_li": ad_mysteel_li,
 }
 
