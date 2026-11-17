@@ -7,8 +7,9 @@
   akshare futures_main_sina : 沪金 AU0 / 沪铜 CU0 / 碳酸锂 LC0（收盘价）
   akshare spot_hist_sge     : 上海金 Au99.99（close）
   akshare futures_foreign_hist_sina（1.20.46 前叫 futures_foreign_hist）: COMEX金 GC / LME铜 CAD（外盘 close）
-  LME 铜库存：原接口 macro_euro_lme_stock 的数据 2026-07-17 起停更，akshare 1.20.48 已删除该接口；
-              这里改为 frozen（不再取数，只保留历史），页面上标"已停更"
+  LME 铜库存：原接口 akshare macro_euro_lme_stock 2026-07-17 起停更、1.20.48 已删除；
+              改用 Westmetall 转载的 LME 官方日报（field=LME_Cu_cash，第 4 列 stock，吨→万吨），
+              和电解铝模块的 LME 铝库存同一来源
   Mysteel li.mysteel.com    : 碳酸锂现货三品级（静态表，取中间价 t9 price；全字段都存）
 
 用法：
@@ -42,7 +43,7 @@ METRICS = [
     # 铜
     {"id": "cu_shfe",  "name": "沪铜",          "unit": "元/吨",     "group": "copper", "src": "ak_futures_main",  "params": {"symbol": "CU0"}},
     {"id": "cu_lme",   "name": "LME铜",         "unit": "美元/吨",   "group": "copper", "src": "ak_foreign",       "params": {"symbol": "CAD"}},
-    {"id": "cu_lme_inv","name": "LME铜库存（已停更）", "unit": "万吨", "group": "copper", "src": "frozen",     "params": {"metal": "铜"}, "hide_chart": True},
+    {"id": "cu_lme_inv","name": "LME铜库存",    "unit": "万吨",      "group": "copper", "src": "westmetall", "params": {"field": "LME_Cu_cash"}, "hide_chart": True},
     # 锂
     {"id": "lc_futures","name": "碳酸锂期货",   "unit": "元/吨",     "group": "lithium","src": "ak_futures_main",  "params": {"symbol": "LC0"}},
 ]
@@ -134,6 +135,35 @@ def ad_ak_lme_stock(metrics, start_d):
     return out
 
 
+def parse_westmetall(html):
+    """Westmetall 表格 → [(日期, 库存吨)]。表头 date / Cash-Settlement / 3-month / stock，日期如 '19. October 2026'。"""
+    out = []
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S | re.I):
+        tds = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", tr, re.S | re.I)]
+        if len(tds) < 4:
+            continue
+        try:
+            d = datetime.strptime(re.sub(r"\s+", " ", tds[0]).replace(".", ""), "%d %B %Y").date()
+            v = float(tds[3].replace(",", ""))
+        except ValueError:
+            continue
+        out.append((d.isoformat(), v))
+    return out
+
+
+def ad_westmetall(metrics, start_d):
+    from urllib.request import Request, urlopen
+    out = []
+    for m in metrics:
+        url = "https://www.westmetall.com/en/markdaten.php?action=table&field=" + m["params"]["field"]
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (PID dashboard; +https://github.com/gmbob990132/PID)"})
+        rows = parse_westmetall(urlopen(req, timeout=60).read().decode("utf-8", "replace"))
+        if not rows:
+            raise ValueError("Westmetall 页面未解析到库存行（页面结构可能变化）")
+        out += [(m["id"], d, round(v / 10000.0, 2)) for d, v in rows if d >= start_d.isoformat()]
+    return out
+
+
 def ad_mysteel_li(metrics, start_d):
     """抓 li.mysteel.com 碳酸锂现货表（静态）。按 name 精确匹配行，取 mid/low/high/chg。
     只有当天一行，日期用表内 t6.time。"""
@@ -183,6 +213,7 @@ ADAPTERS = {
     "ak_foreign": ad_ak_foreign,
     "ak_lme_stock": ad_ak_lme_stock,
     "frozen": lambda metrics, start_d: [],      # 数据源已停更：不取数，保留库里历史
+    "westmetall": ad_westmetall,
     "mysteel_li": ad_mysteel_li,
 }
 

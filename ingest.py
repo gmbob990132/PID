@@ -200,7 +200,8 @@ def adapter_akshare_foreign_hist(metrics):
     import akshare as ak
     out = []
     for m in metrics:
-        df = ak.futures_foreign_hist(symbol=m["params"]["symbol"])
+        fn = getattr(ak, "futures_foreign_hist_sina", None) or getattr(ak, "futures_foreign_hist")   # 1.20.46 起改名
+        df = fn(symbol=m["params"]["symbol"])
         out += _price_rows_to_obs(df, m, "akshare/futures_foreign_hist/")
     return out
 

@@ -162,7 +162,8 @@ def bond_fetch_range(start_d, end_d):
 
 def _spx_akshare(start_d, end_d):
     import akshare as ak
-    df = ak.index_us_stock_sina(symbol=".INX")
+    fn = getattr(ak, "index_us_daily_sina", None) or getattr(ak, "index_us_stock_sina")   # 1.20.45 起改名
+    df = fn(symbol=".INX")
     out = {}
     for _, r in df.iterrows():
         d = _norm_date(r["date"])
