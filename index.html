@@ -596,6 +596,7 @@ function erpAbsClass(v){ return v==null?"flat":(v>=6?"down":(v<=3?"up":"flat"));
 
 // 公式说明：股权溢价 = 盈利收益率(100÷PE_TTM) − 10年期国债收益率；并列出最新一天的各分项
 function erpFormulaHtml(last, peS){
+  return "";   // 暂不显示公式与算例（PE 口径统一前先隐藏）
   let comp="";
   const pt=peS&&(peS.points||[]).find(p=>p.date===last.date);
   if(pt&&pt.value){
