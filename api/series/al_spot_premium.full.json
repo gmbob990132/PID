@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-18T09:40:09+00:00",
+  "generated_at": "2026-11-19T09:01:40+00:00",
   "metric": {
     "id": "al_spot_premium",
     "name": "现货升贴水",
@@ -391,6 +391,12 @@
       "date": "2026-11-18",
       "value": 990.0,
       "change": 200.0,
+      "src_change": null
+    },
+    {
+      "date": "2026-11-19",
+      "value": 950.0,
+      "change": -40.0,
       "src_change": null
     }
   ]
