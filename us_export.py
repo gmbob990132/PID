@@ -139,7 +139,7 @@ def export(db=DB, out=OUT, today=None):
         dump("series/pe.json", series_json(ped, 2))
         pm = [v for _, v in S["pe_m"]]
         ov["val"]["pe"] = {"date": ped[-1][0], "value": round(ped[-1][1], 2), "monthly_date": S["pe_m"][-1][0],
-                           "pct_all": pos(pm, ped[-1][1]), "pct_20y": pos(window(S["pe_m"], 20, today), ped[-1][1]),
+                           "pct_5y": pos(window(ped, 5, today), ped[-1][1]), "pct_10y": pos(window(ped, 10, today), ped[-1][1]),
                            "median_all": round(quant(pm, .5), 2), "since": S["pe_m"][0][0][:4]}
         if S["us10y"]:
             y = asof_join([d for d, _ in ped], S["us10y"])
@@ -156,8 +156,8 @@ def export(db=DB, out=OUT, today=None):
         dump("series/cape.json", series_json(S["cape_m"], 2))
         cv = [v for _, v in S["cape_m"]]
         cur = cv[-1]
-        ov["val"]["cape"] = {"date": S["cape_m"][-1][0], "value": round(cur, 2), "pct_all": pos(cv, cur),
-                             "pct_20y": pos(window(S["cape_m"], 20, today), cur), "mean_all": round(sum(cv) / len(cv), 2),
+        ov["val"]["cape"] = {"date": S["cape_m"][-1][0], "value": round(cur, 2),
+                             "pct_5y": pos(window(S["cape_m"], 5, today), cur), "pct_10y": pos(window(S["cape_m"], 10, today), cur), "mean_all": round(sum(cv) / len(cv), 2),
                              "q_all": qset(cv, 2), "since": S["cape_m"][0][0][:4]}
     # VIX
     if S["vix"]:
@@ -166,8 +166,8 @@ def export(db=DB, out=OUT, today=None):
         cur = vv[-1]
         prev = vv[-2] if len(vv) > 1 else None
         ov["val"]["vix"] = {"date": S["vix"][-1][0], "value": round(cur, 2), "chg": round(cur - prev, 2) if prev else None,
-                            "pct_all": pos(vv, cur), "pct_5y": pos(window(S["vix"], 5, today), cur),
-                            "median_all": round(quant(vv, .5), 2), "q_all": qset(vv, 2), "since": S["vix"][0][0][:4]}
+                            "pct_5y": pos(window(S["vix"], 5, today), cur), "pct_10y": pos(window(S["vix"], 10, today), cur),
+                            "q10y": qset(window(S["vix"], 10, today), 2), "since": S["vix"][0][0][:4]}
     # 半导体相对强弱 SOX ÷ NDX（按 NDX 日期对齐）
     if S["sox"] and S["ndx"]:
         sm = dict(S["sox"])
@@ -176,7 +176,7 @@ def export(db=DB, out=OUT, today=None):
             dump("series/sox_ndx.json", series_json(r, 5))
             w5 = window(r, 5, today)
             ov["ratio"] = {"date": r[-1][0], "value": round(r[-1][1], 5), "pct_5y": pos(w5, r[-1][1]), "q5y": qset(w5, 5),
-                           "pct_all": pos([v for _, v in r], r[-1][1]), "since": r[0][0][:4]}
+                           "pct_10y": pos(window(r, 10, today), r[-1][1]), "since": r[0][0][:4]}
     # QVIX（A 股指数页用）
     for idx, (mid, nm) in QVIX.items():
         pts = S[mid]
@@ -186,7 +186,7 @@ def export(db=DB, out=OUT, today=None):
         cur = vals[-1]
         w5 = window(pts, 5, today)
         dump(f"qvix/{idx}.json", {"name": nm, **series_json(pts, 2), "latest": {"date": pts[-1][0], "value": round(cur, 2)},
-                                  "pct_all": pos(vals, cur), "pct_5y": pos(w5, cur), "q5y": qset(w5, 2),
+                                  "pct_5y": pos(w5, cur), "pct_10y": pos(window(pts, 10, today), cur), "q5y": qset(w5, 2),
                                   "median_all": round(quant(vals, .5), 2), "since": pts[0][0][:4]})
     dump("overview.json", ov)
     print(f"导出完成 → {out}：指数卡片 {list(ov['cards'])}，估值 {list(ov['val'])}，相对强弱 {'有' if ov['ratio'] else '无'}，"
@@ -224,7 +224,7 @@ def selftest():
         s = json.load(open(os.path.join(td, "us_api", "series", "pe.json")))
         i = s["dates"].index("2016-06-15"); assert 19.5 < s["values"][i] < 20.5, s["values"][i]
         cd = ov["cards"]["spx"]; assert cd["chg"] == 1 and cd["dd"] == 0 and cd["ytd_pct"] > 0, cd
-        assert ov["ratio"]["value"] > 0 and ov["val"]["vix"]["q_all"]["p50"] > 0
+        assert ov["ratio"]["value"] > 0 and ov["val"]["vix"]["q10y"]["p50"] > 0 and ov["val"]["pe"]["pct_10y"] is not None
         q = json.load(open(os.path.join(td, "us_api", "qvix", "csi300.json")))
         assert q["latest"]["date"] == last and q["q5y"] and len(q["dates"]) == 4000
         assert not os.path.exists(os.path.join(td, "us_api", "qvix", "cyb.json"))   # 没数据不生成
