@@ -73,6 +73,8 @@
     .wrap{padding:14px 12px 40px}.chart{height:280px}
     .card{padding:14px 15px;border-radius:14px}.card .val{font-size:24px}
   }
+  .grid4{grid-template-columns:repeat(4,1fr)}
+  @media (max-width:900px){.grid4{grid-template-columns:repeat(2,1fr)}}
   .agri-acc{grid-column:1/-1;background:var(--card);border:1px solid var(--navy);border-radius:16px;padding:10px 14px;margin-top:-4px}
   .agri-sub{font-size:12.5px;color:var(--sec);margin:4px 2px 6px}
 
@@ -441,7 +443,7 @@ function selectErp(){                 // 一级 tab「指数估值」处理器�
       try{ const ix=await loadJSON("valuation_api/indexes.json"); valIndexes=ix.indexes||[]; }
       catch(e){ valIndexes=[{id:"csi300",name:"沪深300",years:[5,10]}]; }
     }
-    if(!valIndexes.some(x=>x.id===curErpIdx)) curErpIdx=(valIndexes[0]||{}).id||"csi300";
+    if(curErpIdx!=="us" && !valIndexes.some(x=>x.id===curErpIdx)) curErpIdx=(valIndexes[0]||{}).id||"csi300";
     const yy=(valIndexes.find(x=>x.id===curErpIdx)||{}).years||[5];
     if(!yy.includes(valYear)) valYear=yy[0];
     renderValSubBar(); renderValPane();
@@ -459,6 +461,11 @@ function renderValSubBar(){
       renderValSubBar(); renderValPane(); };
     bar.appendChild(b);
   });
+  const ub=document.createElement("button");               // 美股（不在 valuation 的指数列表里，单独追加）
+  ub.className="sub-btn"+(curErpIdx==="us"?" on":"");
+  ub.textContent="美股";
+  ub.onclick=()=>{ curErpIdx="us"; renderValSubBar(); renderValPane(); };
+  bar.appendChild(ub);
 }
 
 function valIdxMeta(){ return valIndexes.find(x=>x.id===curErpIdx)||{name:"",years:[5]}; }
@@ -489,6 +496,7 @@ function valEnd(){ return (valCustom&&valCustom.end)?valCustom.end:"9999-12-31";
 function fltRange(pts){ const a=valCutoff(),b=valEnd(); return pts.filter(p=> p.date>=a && p.date<=b); }
 
 async function renderValPane(){
+  if(curErpIdx==="us"){ await renderUsPane(); return; }
   const pane=document.getElementById("pane");
   const idx=curErpIdx, meta=valIdxMeta(), nm=meta.name, years=meta.years||[5];
   const [ov, perc] = await Promise.all([
@@ -517,6 +525,8 @@ async function renderValPane(){
     html+='</div>';
   }
   html+='<div class="erp-chart-sub" id="valsub"></div><div class="erp-chart" id="valchart"></div>';
+  html+='<div id="qvSec" style="display:none"><div class="erp-chart-title" style="margin-top:22px">期权波动率 QVIX</div>'+
+    '<div id="qvhead" style="margin:6px 0 10px"></div><div class="erp-chart-sub" id="qvsub"></div><div class="erp-chart" id="qvc"></div></div>';
   if(idx==="csi300"){
     html+='<div class="erp-chart-title" style="margin-top:22px">股权溢价指数（股债性价比）</div>';
     html+='<div id="erphead" style="margin:6px 0 10px"></div>';
@@ -551,6 +561,7 @@ async function renderValPane(){
   const q=(perc.metrics[valMetric]||{})[valYear+"y"];
   drawValQuant("valchart","valsub",label,fltRange(ws.points||[]),fltRange((ms&&ms.points)||[]),q,2,"近"+valYear+"年");
 
+  await drawQvix(idx);
   if(idx==="csi300"){ await drawCsi300Erp(); await drawCsi300Divergence(); }
 }
 
@@ -715,6 +726,209 @@ function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit, yrLabe
   });
   erpCharts.push(el);
 }
+// ================== 美股（指数估值下的子页）+ A 股指数页的 QVIX ==================
+// 数据：us_api/overview.json、us_api/series/<id>.json（{dates,values}）、us_api/qvix/<idx>.json
+// 颜色：指数涨跌沿用红涨绿跌；百分位、比值、VIX 一律中性色，只描述位置，不做好坏判断。
+const US_COL = {comp:"#2a6fdb", ndx:"#1f3050", sox:"#d98a1f", spx:"#8a8780"};
+const US_SHORT = {comp:"纳指综合", ndx:"纳指100", sox:"费城半导体", spx:"标普500"};
+let usPick = "sox";
+function usPts(s){ return s? s.dates.map((d,i)=>({date:d, value:s.values[i]})) : []; }
+async function usSeries(id){ return usPts(await loadCached("us_api/series/"+id+".json").catch(()=>null)); }
+function usFmt(x,dp){ return x==null?"—":Number(x).toLocaleString("en-US",{minimumFractionDigits:dp,maximumFractionDigits:dp}); }
+function usPct(x,dp){ return x==null?"—":((x>0?"+":"")+(x*100).toFixed(dp==null?2:dp)+"%"); }
+function usPos(x){ return x==null?"—":Math.round(x*100)+"%"; }
+const US_AX = {axisLabel:{color:"#888"}, splitLine:{lineStyle:{color:"#eee"}}};
+const US_X = (dates)=>({type:"category",data:dates,boundaryGap:false,axisLabel:{color:"#888",formatter:v=>v.slice(2,7)},axisLine:{lineStyle:{color:"#ddd"}}});
+
+function usIndexCard(k, c){
+  if(!c) return '<div class="card"><div class="nm">'+US_SHORT[k]+'</div><div class="meta-line">暂无数据</div></div>';
+  return '<div class="card"><div class="nm">'+esc(c.name)+' <span style="color:var(--muted)">'+esc(c.code)+'</span></div>'+
+    '<div class="val">'+usFmt(c.close,2)+'</div>'+
+    '<div class="chg '+chgClass(c.chg)+'">'+usPct(c.chg_pct)+' <span style="color:var(--muted);font-weight:400">'+(c.chg>0?"+":"")+usFmt(c.chg,2)+'</span></div>'+
+    '<div class="yoy">年初至今 <b class="'+chgClass(c.ytd_pct)+'">'+usPct(c.ytd_pct)+'</b></div>'+
+    '<div class="yoy">距历史高点 <b>'+(c.dd>-0.0005?"新高":usPct(c.dd))+'</b></div>'+
+    '<div class="meta-line">'+esc(c.date)+'（美东）</div></div>';
+}
+function usValCard(title, valHtml, lines, meta){
+  return '<div class="card"><div class="nm">'+title+'</div><div class="val">'+valHtml+'</div>'+
+    lines.map(l=>'<div style="font-size:12.5px;margin-top:4px;color:var(--sec)">'+l+'</div>').join("")+
+    (meta?'<div class="meta-line">'+meta+'</div>':'')+'</div>';
+}
+
+async function renderUsPane(){
+  const pane=document.getElementById("pane");
+  let ov;
+  try{ ov=await loadCached("us_api/overview.json"); }
+  catch(e){ pane.innerHTML='<div class="empty">美股数据尚未生成（需先运行一次 us-daily）</div>'; return; }
+  const C=ov.cards||{}, V=ov.val||{};
+  let h='<div class="grp-title">美股指数</div><div class="grid grid4">'+["comp","ndx","sox","spx"].map(k=>usIndexCard(k,C[k])).join("")+'</div>';
+  h+='<div class="grp-title">估值与情绪</div><div class="grid grid4">';
+  if(V.pe) h+=usValCard("标普500 PE(TTM)", usFmt(V.pe.value,2)+'<span class="u"> 倍</span>',
+    [V.pe.since+"年以来百分位 "+usPos(V.pe.pct_all), "近20年百分位 "+usPos(V.pe.pct_20y)], "长期中位数 "+usFmt(V.pe.median_all,1)+"　"+esc(V.pe.date));
+  if(V.cape) h+=usValCard("席勒 CAPE", usFmt(V.cape.value,2)+'<span class="u"> 倍</span>',
+    [V.cape.since+"年以来百分位 "+usPos(V.cape.pct_all), "近20年百分位 "+usPos(V.cape.pct_20y)], "长期均值 "+usFmt(V.cape.mean_all,1)+"　"+esc(V.cape.date.slice(0,7))+"（月度）");
+  if(V.erp) h+=usValCard("标普500 股权溢价", usFmt(V.erp.value,2)+'<span class="u"> %</span>',
+    ["近5年百分位 "+usPos(V.erp.pct_5y), "近10年百分位 "+usPos(V.erp.pct_10y)], "盈利收益率 "+usFmt(V.erp.ey,2)+"% − 美债10年 "+usFmt(V.erp.us10y,2)+"%");
+  if(V.vix) h+=usValCard("VIX 恐慌指数", usFmt(V.vix.value,2)+(V.vix.chg!=null?' <span class="u">'+(V.vix.chg>0?"+":"")+usFmt(V.vix.chg,2)+'</span>':''),
+    [V.vix.since+"年以来百分位 "+usPos(V.vix.pct_all), "近5年百分位 "+usPos(V.vix.pct_5y)], "长期中位数 "+usFmt(V.vix.median_all,1)+"　"+esc(V.vix.date));
+  h+='</div>';
+  // 时间范围（与其他指数页共用）
+  h+='<div class="erp-timebar">';
+  VAL_RANGES.forEach(([k,label])=> h+='<span class="erp-rg'+((!valCustom&&k===valRange)?" on":"")+'" data-r="'+k+'">'+label+'</span>');
+  h+='<span class="erp-custom"><input type="date" id="valStart"> 至 <input type="date" id="valEnd"></span></div>';
+  h+='<div class="erp-chart-title">相对走势</div><div class="erp-chart-sub">区间起点统一折算为 100，比较同一时间段内各指数的涨跌幅</div><div class="erp-chart" id="usRel"></div>';
+  h+='<div class="erp-chart-title" style="margin-top:22px">单指数走势</div><div class="ranges" id="usPick" style="overflow-x:auto"></div>'+
+     '<div class="erp-chart-sub" id="usOneSub"></div><div class="erp-chart" id="usOne" style="height:360px"></div>';
+  if(ov.ratio) h+='<div class="erp-chart-title" style="margin-top:22px">半导体相对强弱（费城半导体 ÷ 纳斯达克100）</div>'+
+     '<div id="usRatioHead" style="margin:6px 0 10px"></div><div class="erp-chart-sub" id="usRatioSub"></div><div class="erp-chart" id="usRatio"></div>';
+  if(V.erp) h+='<div class="erp-chart-title" style="margin-top:22px">标普500 股权溢价</div>'+
+     '<div class="erp-chart-sub">标普500 点位（左轴）+ 股权溢价%（右轴）；股权溢价 = 100 ÷ PE(TTM) − 美国10年期国债收益率，与沪深300 同一公式</div><div class="erp-chart" id="usErp1"></div>'+
+     '<div class="erp-chart-sub" id="usErpSub"></div><div class="erp-chart" id="usErp2"></div>';
+  if(V.cape) h+='<div class="erp-chart-title" style="margin-top:22px">席勒 CAPE（周期调整市盈率）</div>'+
+     '<div class="erp-chart-sub" id="usCapeSub"></div><div class="erp-chart" id="usCape"></div>';
+  if(V.vix) h+='<div class="erp-chart-title" style="margin-top:22px">VIX 恐慌指数</div>'+
+     '<div class="erp-chart-sub" id="usVixSub"></div><div class="erp-chart" id="usVix"></div>';
+  h+='<div style="font-size:12px;color:var(--muted);margin:22px 2px 0;line-height:1.7">'+
+     '数据说明：点位为收盘价（美东时间）；标普500 PE 为 GAAP 口径 TTM，月度数据按每日收盘折算成日度；席勒 CAPE 为月度数据。<br>'+
+     '百分位、比值、VIX 只描述历史位置，用中性色，不做好坏判断。仅展示客观数据，不构成任何投资建议。</div>';
+  pane.innerHTML=h;
+
+  document.querySelectorAll(".erp-rg").forEach(el=>el.onclick=()=>{ valRange=el.dataset.r; valCustom=null; renderValPane(); });
+  const si=document.getElementById("valStart"), ei=document.getElementById("valEnd");
+  if(valCustom){ if(si)si.value=valCustom.start||""; if(ei)ei.value=valCustom.end||""; }
+  const onC=()=>{ if(si&&si.value){ valCustom={start:si.value, end:(ei&&ei.value)||undefined}; renderValPane(); } };
+  if(si) si.onchange=onC; if(ei) ei.onchange=onC;
+  erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[];
+
+  const S={}; await Promise.all(["comp","ndx","sox","spx"].map(async k=>{ S[k]=await usSeries(k); }));
+  usDrawRel(S); usDrawOne(S);
+  if(ov.ratio) await usDrawRatio(ov.ratio);
+  if(V.erp) await usDrawErp(S.spx, V.erp);
+  if(V.cape) await usDrawCape(V.cape);
+  if(V.vix) await usDrawVix(V.vix);
+}
+
+function usDrawRel(S){
+  const keys=["comp","ndx","sox","spx"].filter(k=>S[k].length);
+  const a=valCutoff(), b=valEnd();
+  // 以纳指综合（历史最长）的交易日为横轴，其他指数取 ≤ 当日最近收盘
+  const base=(S.comp.length?S.comp:S[keys[0]]).filter(p=>p.date>=a&&p.date<=b);
+  const dates=base.map(p=>p.date);
+  const series=keys.map(k=>{
+    const pts=S[k]; let j=-1;
+    const vals=dates.map(d=>{ while(j+1<pts.length && pts[j+1].date<=d) j++; return j>=0? pts[j].value:null; });
+    const first=vals.find(v=>v!=null);
+    return {name:US_SHORT[k],type:"line",showSymbol:false,connectNulls:true,itemStyle:{color:US_COL[k]},
+      lineStyle:{width:k==="spx"?1.5:2,type:k==="spx"?"dashed":"solid"},
+      data:vals.map(v=>v==null||!first?null:+(v/first*100).toFixed(2))};
+  });
+  const el=echarts.init(document.getElementById("usRel"));
+  el.setOption({grid:{left:8,right:10,top:innerWidth<600?52:30,bottom:24,containLabel:true},
+    legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3},tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":v.toFixed(1)},
+    xAxis:US_X(dates),yAxis:{type:"value",scale:true,...US_AX},series});
+  erpCharts.push(el);
+}
+
+function usDrawOne(S){
+  const bar=document.getElementById("usPick");
+  bar.innerHTML=["comp","ndx","sox","spx"].map(k=>'<span class="rg'+(k===usPick?" on":"")+'" style="white-space:nowrap" data-k="'+k+'">'+US_SHORT[k]+'</span>').join("");
+  bar.querySelectorAll(".rg").forEach(e=>e.onclick=()=>{ usPick=e.dataset.k; const old=erpCharts.findIndex(c=>c.getDom&&c.getDom().id==="usOne");
+    if(old>=0){ try{erpCharts[old].dispose();}catch(_){} erpCharts.splice(old,1);} usDrawOne(S); });
+  const all=S[usPick]; if(!all.length) return;
+  let hi=0; const dd={}; all.forEach(p=>{ hi=Math.max(hi,p.value); dd[p.date]=+((p.value/hi-1)*100).toFixed(2); });
+  const F=fltRange(all), dates=F.map(p=>p.date), vals=F.map(p=>p.value);
+  const mx=Math.max(...vals), mn=Math.min(...vals);
+  document.getElementById("usOneSub").textContent=US_SHORT[usPick]+"：区间最高 "+usFmt(mx,2)+"，最低 "+usFmt(mn,2)+"；下方为距历史高点的回撤（%）";
+  const col=US_COL[usPick];
+  const el=echarts.init(document.getElementById("usOne"));
+  el.setOption({axisPointer:{link:[{xAxisIndex:"all"}]},tooltip:{trigger:"axis"},
+    grid:[{left:8,right:10,top:12,height:"56%",containLabel:true},{left:8,right:10,top:"73%",bottom:24,containLabel:true}],
+    xAxis:[{...US_X(dates),gridIndex:0,axisLabel:{show:false}},{...US_X(dates),gridIndex:1}],
+    yAxis:[{type:"value",scale:true,gridIndex:0,...US_AX},{type:"value",gridIndex:1,max:0,splitNumber:2,...US_AX,axisLabel:{color:"#888",formatter:"{value}%"}}],
+    series:[{name:"点位",type:"line",showSymbol:false,data:vals,itemStyle:{color:col},lineStyle:{width:2},
+             areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:col+"33"},{offset:1,color:col+"00"}])}},
+            {name:"距历史高点",type:"line",xAxisIndex:1,yAxisIndex:1,showSymbol:false,data:dates.map(d=>dd[d]),itemStyle:{color:"#9c9a93"},
+             lineStyle:{width:1},areaStyle:{color:"rgba(150,150,150,.18)"},tooltip:{valueFormatter:v=>v+"%"}}]});
+  erpCharts.push(el);
+}
+
+async function usDrawRatio(R){
+  const all=await usSeries("sox_ndx"); if(!all.length) return;
+  document.getElementById("usRatioHead").innerHTML='<div class="grid"><div class="card"><div class="nm">半导体相对强弱</div>'+
+    '<div class="val">'+R.value.toFixed(4)+'</div><div style="font-size:12.5px;margin-top:4px;color:var(--sec)">近5年百分位 '+usPos(R.pct_5y)+'</div>'+
+    '<div style="font-size:12.5px;margin-top:4px;color:var(--sec)">'+R.since+'年以来百分位 '+usPos(R.pct_all)+'</div>'+
+    '<div class="meta-line">比值上升 = 半导体跑赢纳斯达克100　'+esc(R.date)+'</div></div></div>';
+  const F=fltRange(all);
+  drawErpQuant("usRatio","usRatioSub","SOX÷NDX","#6b5bd6",F.map(p=>p.date),F,R.q5y,4,"","近5年");
+}
+
+async function usDrawErp(spx, E){
+  const erp=await usSeries("erp"); if(!erp.length) return;
+  const cn=usPts(await loadCached("erp_api/csi300/series/erp.full.json").then(j=>({dates:(j.points||[]).map(p=>p.date),values:(j.points||[]).map(p=>p.value)})).catch(()=>null));
+  const eF=fltRange(erp), dates=eF.map(p=>p.date), smap={}; spx.forEach(p=>smap[p.date]=p.value);
+  const c1=echarts.init(document.getElementById("usErp1"));
+  c1.setOption({grid:{left:8,right:10,top:30,bottom:24,containLabel:true},legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3},tooltip:{trigger:"axis"},
+    xAxis:US_X(dates),
+    yAxis:[{type:"value",scale:true,name:"点位",...US_AX},{type:"value",scale:true,name:"溢价%",splitLine:{show:false},axisLabel:{color:"#888"}}],
+    series:[{name:"标普500",type:"line",yAxisIndex:0,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#8a8780"},data:dates.map(d=>smap[d]??null),connectNulls:true},
+            {name:"标普500 股权溢价",type:"line",yAxisIndex:1,showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#d4537e"},data:eF.map(p=>p.value)}]});
+  erpCharts.push(c1);
+  // 图2：标普500 股权溢价 + 近5年分位线；沪深300 股权溢价作对照线（按标普日期取 ≤ 当日最近值）
+  const q=E.q5y, ml=[];
+  document.getElementById("usErpSub").textContent=q?("标普500 分位线（近5年）：20% "+q.p20.toFixed(2)+"%　50% "+q.p50.toFixed(2)+"%　80% "+q.p80.toFixed(2)+"%；虚线为沪深300 股权溢价，可点图例隐藏"):"";
+  if(q) [["20%",q.p20,"#8fbf8f"],["50%",q.p50,"#e0a53b"],["80%",q.p80,"#d47a7a"]].forEach(([l,v,c])=>ml.push({yAxis:v,lineStyle:{type:"dashed",color:c,width:1},
+    label:{formatter:l,color:c,position:"end",distance:4,fontSize:11}}));      // 三条线可能挨得很近：线上只标 20%/50%/80%，数值看副标题
+  let j=-1; const cv=dates.map(d=>{ while(j+1<cn.length && cn[j+1].date<=d) j++; return j>=0? cn[j].value:null; });
+  const c2=echarts.init(document.getElementById("usErp2"));
+  c2.setOption({grid:{left:8,right:96,top:30,bottom:24,containLabel:true},legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(2)+"%"},xAxis:US_X(dates),yAxis:{type:"value",scale:true,...US_AX},
+    series:[{name:"标普500 股权溢价",type:"line",showSymbol:false,lineStyle:{width:2},itemStyle:{color:"#d4537e"},data:eF.map(p=>p.value),markLine:{silent:true,symbol:"none",data:ml}},
+            ...(cn.length?[{name:"沪深300 股权溢价",type:"line",showSymbol:false,connectNulls:true,lineStyle:{width:1.5,type:"dashed"},itemStyle:{color:"#2a6fdb"},data:cv}]:[])]});
+  erpCharts.push(c2);
+}
+
+async function usDrawCape(K){
+  const all=await usSeries("cape"); if(!all.length) return;
+  const q=K.q_all, ml=[{yAxis:K.mean_all,lineStyle:{type:"solid",color:"#9c9a93",width:1},label:{formatter:"长期均值 "+K.mean_all.toFixed(1),color:"#9c9a93",position:"end",distance:4,fontSize:11}}];
+  if(q) [["20%",q.p20,"#8fbf8f"],["80%",q.p80,"#d47a7a"]].forEach(([l,v,c])=>ml.push({yAxis:v,lineStyle:{type:"dashed",color:c,width:1},label:{formatter:l+"分位 "+v.toFixed(1),color:c,position:"end",distance:4,fontSize:11}}));
+  document.getElementById("usCapeSub").textContent=K.since+" 年至今的月度数据（不受上方时间范围影响）；长期均值 "+K.mean_all.toFixed(1)+(q?"，20% / 80% 分位 "+q.p20.toFixed(1)+" / "+q.p80.toFixed(1):"");
+  const el=echarts.init(document.getElementById("usCape"));
+  el.setOption({grid:{left:8,right:96,top:16,bottom:24,containLabel:true},tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(2)},
+    xAxis:{...US_X(all.map(p=>p.date)),axisLabel:{color:"#888",formatter:v=>v.slice(0,4)}},yAxis:{type:"value",scale:true,...US_AX},
+    series:[{name:"席勒 CAPE",type:"line",showSymbol:false,lineStyle:{width:1.5},itemStyle:{color:"#1f3050"},data:all.map(p=>p.value),markLine:{silent:true,symbol:"none",data:ml}}]});
+  erpCharts.push(el);
+}
+
+async function usDrawVix(X){
+  const all=await usSeries("vix"); if(!all.length) return;
+  const qv=await loadCached("us_api/qvix/csi300.json").catch(()=>null), qp=usPts(qv);
+  const F=fltRange(all), dates=F.map(p=>p.date), q=X.q_all, ml=[];
+  if(q) [["20%",q.p20,"#9c9a93"],["50%",q.p50,"#9c9a93"],["80%",q.p80,"#9c9a93"]].forEach(([l,v,c])=>ml.push({yAxis:v,lineStyle:{type:"dashed",color:"#c9c6bd",width:1},
+    label:{formatter:l+"分位 "+v.toFixed(1),color:c,position:"end",distance:4,fontSize:11}}));
+  document.getElementById("usVixSub").textContent=(q?X.since+" 年以来分位线：20% "+q.p20.toFixed(1)+"　50% "+q.p50.toFixed(1)+"　80% "+q.p80.toFixed(1):"")+
+    (qp.length?"；虚线为沪深300ETF 期权波动率 QVIX（A 股），可点图例隐藏":"");
+  const qmap={}; qp.forEach(p=>qmap[p.date]=p.value);
+  const el=echarts.init(document.getElementById("usVix"));
+  el.setOption({grid:{left:8,right:96,top:30,bottom:24,containLabel:true},legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3},
+    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(2)},xAxis:US_X(dates),yAxis:{type:"value",scale:true,...US_AX},
+    series:[{name:"VIX",type:"line",showSymbol:false,lineStyle:{width:1.8},itemStyle:{color:"#6b5bd6"},data:F.map(p=>p.value),markLine:{silent:true,symbol:"none",data:ml}},
+            ...(qp.length?[{name:"沪深300 QVIX",type:"line",showSymbol:false,connectNulls:true,lineStyle:{width:1.3,type:"dashed"},itemStyle:{color:"#e0a53b"},data:dates.map(d=>qmap[d]??null)}]:[])]});
+  erpCharts.push(el);
+}
+
+// —— A 股指数页：期权波动率 QVIX ——
+async function drawQvix(idx){
+  let j; try{ j=await loadCached("us_api/qvix/"+idx+".json"); }catch(e){ return; }
+  const sec=document.getElementById("qvSec"); if(!sec) return; sec.style.display="";
+  document.getElementById("qvhead").innerHTML='<div class="grid"><div class="card"><div class="nm">'+esc(j.name)+'</div>'+
+    '<div class="val">'+usFmt(j.latest.value,2)+'</div>'+
+    '<div style="font-size:12.5px;margin-top:4px;color:var(--sec)">近5年百分位 '+usPos(j.pct_5y)+'</div>'+
+    '<div style="font-size:12.5px;margin-top:4px;color:var(--sec)">'+j.since+'年以来百分位 '+usPos(j.pct_all)+'</div>'+
+    '<div class="meta-line">数值越高，期权隐含的未来波动越大　'+esc(j.latest.date)+'</div></div></div>';
+  const F=fltRange(usPts(j));
+  drawErpQuant("qvc","qvsub","QVIX","#6b5bd6",F.map(p=>p.date),F,j.q5y,2,"","近5年");
+}
+
 // ================== 金属模块（新增：概览分块 + 金/铜/锂走势） ==================
 const METAL_ORDER = ["gold","copper","lithium"];
 const METALS_RANGES = [["1m","近1月"],["6m","近6月"],["1y","近1年"],["all","全部"]];
