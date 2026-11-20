@@ -1,0 +1,38 @@
+name: us-daily
+# 美股指数 / 标普500 PE·CAPE / VIX / 美债10年 + A股 QVIX → data/us.db → us_api/
+# 一天两次：北京 06:40（美股收盘后）、北京 16:40（A股收盘后，更新 QVIX）
+on:
+  schedule:
+    - cron: '40 22 * * *'
+    - cron: '40 8 * * *'
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: us-daily
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install akshare --quiet
+      - name: 取数（个别来源失败只告警，其余照常导出）
+        run: python3 us_ingest.py || echo "::warning::us_ingest 全部来源失败，详见上方日志"
+      - run: python3 us_export.py
+      - name: 提交数据（同步远端 + 重试）
+        run: |
+          git config user.name  "github-actions"
+          git config user.email "actions@github.com"
+          git add -A data/us.db us_api
+          if git diff --cached --quiet; then echo "无变化"; exit 0; fi
+          git commit -m "us update $(TZ=Asia/Shanghai date +%F)"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push origin main && { echo "推送成功"; exit 0; }
+            echo "推送失败，第 $i 次重试…"; sleep 10
+          done
+          echo "多次重试仍失败"; exit 1
