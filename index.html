@@ -729,8 +729,8 @@ function drawErpQuant(elId, subId, name, color, dates, ptsF, q, dp, unit, yrLabe
 // ================== 美股（指数估值下的子页）+ A 股指数页的 QVIX ==================
 // 数据：us_api/overview.json、us_api/series/<id>.json（{dates,values}）、us_api/qvix/<idx>.json
 // 颜色：指数涨跌沿用红涨绿跌；百分位、比值、VIX 一律中性色，只描述位置，不做好坏判断。
-const US_COL = {comp:"#2a6fdb", ndx:"#1f3050", sox:"#d98a1f", spx:"#8a8780"};
-const US_SHORT = {comp:"纳指综合", ndx:"纳指100", sox:"费城半导体", spx:"标普500"};
+const US_COL = {ndx:"#2a6fdb", sox:"#d98a1f", spx:"#8a8780"};
+const US_SHORT = {ndx:"纳指100", sox:"费城半导体", spx:"标普500"};
 let usPick = "sox";
 function usPts(s){ return s? s.dates.map((d,i)=>({date:d, value:s.values[i]})) : []; }
 async function usSeries(id){ return usPts(await loadCached("us_api/series/"+id+".json").catch(()=>null)); }
@@ -761,7 +761,7 @@ async function renderUsPane(){
   try{ ov=await loadCached("us_api/overview.json"); }
   catch(e){ pane.innerHTML='<div class="empty">美股数据尚未生成（需先运行一次 us-daily）</div>'; return; }
   const C=ov.cards||{}, V=ov.val||{};
-  let h='<div class="grp-title">美股指数</div><div class="grid grid4">'+["spx","comp","ndx","sox"].map(k=>usIndexCard(k,C[k])).join("")+'</div>';
+  let h='<div class="grp-title">美股指数</div><div class="grid">'+["spx","ndx","sox"].map(k=>usIndexCard(k,C[k])).join("")+'</div>';
   h+='<div class="grp-title">估值与情绪</div><div class="grid grid4">';
   if(V.pe) h+=usValCard("标普500 PE(TTM)", usFmt(V.pe.value,2)+'<span class="u"> 倍</span>',
     ["近5年百分位 "+usPos(V.pe.pct_5y), "近10年百分位 "+usPos(V.pe.pct_10y)], esc(V.pe.date));
@@ -800,7 +800,7 @@ async function renderUsPane(){
   if(si) si.onchange=onC; if(ei) ei.onchange=onC;
   erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[];
 
-  const S={}; await Promise.all(["comp","ndx","sox","spx"].map(async k=>{ S[k]=await usSeries(k); }));
+  const S={}; await Promise.all(["spx","ndx","sox"].map(async k=>{ S[k]=await usSeries(k); }));
   usDrawRel(S); usDrawOne(S);
   if(V.erp) await usDrawErp(S.spx, V.erp);
   if(V.cape) await usDrawCape(V.cape);
@@ -809,10 +809,10 @@ async function renderUsPane(){
 }
 
 function usDrawRel(S){
-  const keys=["comp","ndx","sox","spx"].filter(k=>S[k].length);
+  const keys=["spx","ndx","sox"].filter(k=>S[k].length);
   const a=valCutoff(), b=valEnd();
-  // 以纳指综合（历史最长）的交易日为横轴，其他指数取 ≤ 当日最近收盘
-  const base=(S.comp.length?S.comp:S[keys[0]]).filter(p=>p.date>=a&&p.date<=b);
+  // 以标普500（历史最长）的交易日为横轴，其他指数取 ≤ 当日最近收盘
+  const base=(S.spx.length?S.spx:S[keys[0]]).filter(p=>p.date>=a&&p.date<=b);
   const dates=base.map(p=>p.date);
   const series=keys.map(k=>{
     const pts=S[k]; let j=-1;
@@ -831,7 +831,7 @@ function usDrawRel(S){
 
 function usDrawOne(S){
   const bar=document.getElementById("usPick");
-  bar.innerHTML=["spx","comp","ndx","sox"].map(k=>'<span class="rg'+(k===usPick?" on":"")+'" style="white-space:nowrap" data-k="'+k+'">'+US_SHORT[k]+'</span>').join("");
+  bar.innerHTML=["spx","ndx","sox"].map(k=>'<span class="rg'+(k===usPick?" on":"")+'" style="white-space:nowrap" data-k="'+k+'">'+US_SHORT[k]+'</span>').join("");
   bar.querySelectorAll(".rg").forEach(e=>e.onclick=()=>{ usPick=e.dataset.k; const old=erpCharts.findIndex(c=>c.getDom&&c.getDom().id==="usOne");
     if(old>=0){ try{erpCharts[old].dispose();}catch(_){} erpCharts.splice(old,1);} usDrawOne(S); });
   const all=S[usPick]; if(!all.length) return;

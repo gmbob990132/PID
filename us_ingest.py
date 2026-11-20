@@ -4,7 +4,6 @@
 
 指标（metric）与来源；同一指标多个来源时全部尝试、按顺序合并（后面的来源覆盖前面的同日值），
 只要有一个来源成功就算成功，任何一个都失败才记失败：
-  comp      纳斯达克综合     nasdaq 官网 COMP → 新浪 .IXIC → 东财「纳斯达克」（1991 起）
   ndx       纳斯达克100      nasdaq 官网 NDX  → 新浪 .NDX
   sox       费城半导体       nasdaq 官网 SOX  → 新浪 .SOX
   spx       标普500          新浪 .INX → 东财「标普500」（1986 起）
@@ -27,7 +26,7 @@ UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit
       "Accept": "*/*", "Accept-Language": "en-US,en;q=0.9"}
 
 METRICS = {   # id: (名称, 单位)
-    "comp": ("纳斯达克综合", "点"), "ndx": ("纳斯达克100", "点"), "sox": ("费城半导体", "点"), "spx": ("标普500", "点"),
+    "ndx": ("纳斯达克100", "点"), "sox": ("费城半导体", "点"), "spx": ("标普500", "点"),
     "vix": ("VIX 恐慌指数", ""), "pe_m": ("标普500 PE(TTM)", "倍"), "cape_m": ("席勒 CAPE", "倍"), "us10y": ("美国10年国债收益率", "%"),
     "qvix_csi300": ("沪深300ETF 期权波动率 QVIX", ""), "qvix_cyb": ("创业板 期权波动率 QVIX", ""), "qvix_star50": ("科创板 期权波动率 QVIX", ""),
 }
@@ -164,7 +163,6 @@ def src_qvix(fn_name):
 
 
 SOURCES = {
-    "comp": [src_em("纳斯达克"), src_sina(".IXIC"), src_nasdaq("COMP")],
     "ndx": [src_sina(".NDX"), src_nasdaq("NDX")],
     "sox": [src_sina(".SOX"), src_nasdaq("SOX")],
     "spx": [src_em("标普500"), src_sina(".INX")],
@@ -243,7 +241,7 @@ def selftest():
             return rows
         f.__name__ = name
         return f
-    srcs = {"comp": [mk("a", [("2026-11-18", 1.0), ("2026-11-19", 2.0)]), mk("b", [("2026-11-19", 2.5), ("2026-11-20", float("nan"))])],
+    srcs = {"ndx": [mk("a", [("2026-11-18", 1.0), ("2026-11-19", 2.0)]), mk("b", [("2026-11-19", 2.5), ("2026-11-20", float("nan"))])],
             "sox": [mk("x", [], True), mk("y", [("2026-11-19", 9.0), ("9999-01-01", 1.0)])],
             "vix": [mk("z", [], True)]}
     with tempfile.TemporaryDirectory() as td:
@@ -251,10 +249,10 @@ def selftest():
         assert run(db, srcs) == 0
         c = sqlite3.connect(db)
         rows = dict(((m, d), v) for m, d, v in c.execute("SELECT metric,date,value FROM obs"))
-        assert rows[("comp", "2026-11-19")] == 2.5 and rows[("comp", "2026-11-18")] == 1.0, rows
-        assert ("comp", "2026-11-20") not in rows and ("sox", "9999-01-01") not in rows
+        assert rows[("ndx", "2026-11-19")] == 2.5 and rows[("ndx", "2026-11-18")] == 1.0, rows
+        assert ("ndx", "2026-11-20") not in rows and ("sox", "9999-01-01") not in rows
         st = dict(c.execute("SELECT metric,status FROM run_log"))
-        assert st == {"comp": "ok", "sox": "partial", "vix": "failed"}, st
+        assert st == {"ndx": "ok", "sox": "partial", "vix": "failed"}, st
         assert run(db, {"vix": [mk("z", [], True)]}) == 1
     print("selftest OK")
 

@@ -4,7 +4,7 @@
 
   us_api/overview.json        指数卡片、估值卡片（PE / CAPE / 股权溢价 / VIX）、半导体相对强弱
   us_api/series/<id>.json     走势序列 {"dates":[...], "values":[...]}：
-                              comp ndx sox spx vix erp pe cape sox_ndx
+                              spx ndx sox vix erp pe cape sox_ndx
   us_api/qvix/<idx>.json      A 股指数页用的 QVIX：csi300 / cyb / star50
 
 标普500 日度 PE 的算法（multpl 只有月度 PE）：
@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta, timezone
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(ROOT, "data", "us.db")
 OUT = os.path.join(ROOT, "us_api")
-INDEX_NAMES = {"comp": ("纳斯达克综合", "COMP"), "ndx": ("纳斯达克100", "NDX"), "sox": ("费城半导体", "SOX"), "spx": ("标普500", "SPX")}
+INDEX_NAMES = {"spx": ("标普500", "SPX"), "ndx": ("纳斯达克100", "NDX"), "sox": ("费城半导体", "SOX")}
 QVIX = {"csi300": ("qvix_csi300", "沪深300ETF期权 QVIX"), "cyb": ("qvix_cyb", "创业板期权 QVIX"), "star50": ("qvix_star50", "科创板期权 QVIX")}
 
 
@@ -115,7 +115,7 @@ def index_card(pts):
 
 def export(db=DB, out=OUT, today=None):
     c = sqlite3.connect(db)
-    S = {m: load(c, m) for m in ("comp", "ndx", "sox", "spx", "vix", "pe_m", "cape_m", "us10y", *[v[0] for v in QVIX.values()])}
+    S = {m: load(c, m) for m in ("ndx", "sox", "spx", "vix", "pe_m", "cape_m", "us10y", *[v[0] for v in QVIX.values()])}
     c.close()
     os.makedirs(os.path.join(out, "series"), exist_ok=True)
     os.makedirs(os.path.join(out, "qvix"), exist_ok=True)
@@ -206,7 +206,7 @@ def selftest():
         d0 = date(2015, 1, 1)
         for i in range(0, 4000):
             d = (d0 + timedelta(days=i)).isoformat()
-            rows += [("spx", d, 2000 + i), ("ndx", d, 4000 + i), ("sox", d, 600 + i * 0.5), ("comp", d, 5000 + i),
+            rows += [("spx", d, 2000 + i), ("ndx", d, 4000 + i), ("sox", d, 600 + i * 0.5), 
                      ("vix", d, 10 + (i % 30)), ("us10y", d, 2.0), ("qvix_csi300", d, 15 + (i % 10))]
         for y in range(2015, 2026):
             for m in range(1, 13):
@@ -224,6 +224,7 @@ def selftest():
         s = json.load(open(os.path.join(td, "us_api", "series", "pe.json")))
         i = s["dates"].index("2016-06-15"); assert 19.5 < s["values"][i] < 20.5, s["values"][i]
         cd = ov["cards"]["spx"]; assert cd["chg"] == 1 and cd["dd"] == 0 and cd["ytd_pct"] > 0, cd
+        assert list(ov["cards"]) == ["spx", "ndx", "sox"]
         assert ov["ratio"]["value"] > 0 and ov["val"]["vix"]["q10y"]["p50"] > 0 and ov["val"]["pe"]["pct_10y"] is not None
         q = json.load(open(os.path.join(td, "us_api", "qvix", "csi300.json")))
         assert q["latest"]["date"] == last and q["q5y"] and len(q["dates"]) == 4000
