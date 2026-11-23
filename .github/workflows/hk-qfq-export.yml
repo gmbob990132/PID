@@ -11,10 +11,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install tushare akshare openpyxl --quiet
+      - run: pip install akshare openpyxl --quiet
       - run: python3 hk_qfq_export.py
-        env:
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
       - uses: actions/upload-artifact@v4
         with:
           name: hk_qfq_close
