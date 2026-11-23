@@ -1,0 +1,22 @@
+name: hk-qfq-export
+# 一次性导出：中芯 00981.HK、华虹 01347.HK 前复权收盘价 → 在本次运行页面底部 Artifacts 下载
+on:
+  workflow_dispatch: {}
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install tushare akshare openpyxl --quiet
+      - run: python3 hk_qfq_export.py
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hk_qfq_close
+          path: hk_qfq/
+          retention-days: 7
