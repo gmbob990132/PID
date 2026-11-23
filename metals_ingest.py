@@ -4,9 +4,11 @@
 金属模块 · 落库脚本（独立一套，不依赖电解铝/股权代码）
 
 数据源（均已探路验证 GitHub 境外可取）：
-  akshare futures_main_sina : 沪金 AU0 / 沪铜 CU0 / 碳酸锂 LC0（收盘价）
+  akshare futures_main_sina : 沪金 AU0 / 沪银 AG0 / 沪铜 CU0 / 碳酸锂 LC0（收盘价）
   akshare spot_hist_sge     : 上海金 Au99.99（close）
-  akshare futures_foreign_hist_sina（1.20.46 前叫 futures_foreign_hist）: COMEX金 GC / LME铜 CAD（外盘 close）
+  akshare futures_foreign_hist_sina（1.20.46 前叫 futures_foreign_hist）: COMEX金 GC / COMEX银 SI / LME铜 CAD（外盘 close）
+  回补：标了 backfill 的指标（期货/外盘价格）库里不足 BACKFILL_MIN 行时，从 1990 年起全量拉一次，
+        供金银比、金铜比算近 10 年分位；补齐后恢复增量。
   LME 铜库存：原接口 akshare macro_euro_lme_stock 2026-07-17 起停更、1.20.48 已删除；
               改用 Westmetall 转载的 LME 官方日报（field=LME_Cu_cash，第 4 列 stock，吨→万吨），
               和电解铝模块的 LME 铝库存同一来源
@@ -37,12 +39,15 @@ MODULE = {"id": "metals", "name": "金属", "sort_order": 3}
 # ---- 指标配置：id, 名称, 单位, 金属分组, source_ref, params, 图上隐藏? ----
 METRICS = [
     # 金
-    {"id": "au_shfe",  "name": "沪金",          "unit": "元/克",     "group": "gold",   "src": "ak_futures_main",  "params": {"symbol": "AU0"}},
+    {"id": "au_shfe",  "name": "沪金",          "unit": "元/克",     "group": "gold",   "src": "ak_futures_main",  "params": {"symbol": "AU0"}, "backfill": True},
     {"id": "au_sge",   "name": "上海金Au99.99", "unit": "元/克",     "group": "gold",   "src": "ak_spot_sge",      "params": {"symbol": "Au99.99"}},
-    {"id": "au_comex", "name": "COMEX金",       "unit": "美元/盎司", "group": "gold",   "src": "ak_foreign",       "params": {"symbol": "GC"}},
+    {"id": "au_comex", "name": "COMEX金",       "unit": "美元/盎司", "group": "gold",   "src": "ak_foreign",       "params": {"symbol": "GC"}, "backfill": True},
+    # 银
+    {"id": "ag_shfe",  "name": "沪银",          "unit": "元/千克",   "group": "silver", "src": "ak_futures_main",  "params": {"symbol": "AG0"}, "backfill": True},
+    {"id": "ag_comex", "name": "COMEX银",       "unit": "美元/盎司", "group": "silver", "src": "ak_foreign",       "params": {"symbol": "SI"}, "backfill": True},
     # 铜
-    {"id": "cu_shfe",  "name": "沪铜",          "unit": "元/吨",     "group": "copper", "src": "ak_futures_main",  "params": {"symbol": "CU0"}},
-    {"id": "cu_lme",   "name": "LME铜",         "unit": "美元/吨",   "group": "copper", "src": "ak_foreign",       "params": {"symbol": "CAD"}},
+    {"id": "cu_shfe",  "name": "沪铜",          "unit": "元/吨",     "group": "copper", "src": "ak_futures_main",  "params": {"symbol": "CU0"}, "backfill": True},
+    {"id": "cu_lme",   "name": "LME铜",         "unit": "美元/吨",   "group": "copper", "src": "ak_foreign",       "params": {"symbol": "CAD"}, "backfill": True},
     {"id": "cu_lme_inv","name": "LME铜库存",    "unit": "万吨",      "group": "copper", "src": "westmetall", "params": {"field": "LME_Cu_cash"}, "hide_chart": True},
     # 锂
     {"id": "lc_futures","name": "碳酸锂期货",   "unit": "元/吨",     "group": "lithium","src": "ak_futures_main",  "params": {"symbol": "LC0"}},
@@ -62,7 +67,8 @@ for _pid, _short, _full in LC_SPOT:
                         "group": "lithium", "src": "mysteel_li", "params": {"name": _full, "field": _sub},
                         "hide_chart": True, "hide_overview": True})
 
-GROUP_NAME = {"gold": "金", "copper": "铜", "lithium": "锂"}
+GROUP_NAME = {"gold": "金", "silver": "银", "copper": "铜", "lithium": "锂"}
+BACKFILL_MIN = 1500          # 不足这么多行就视为没回补过
 
 
 # ================= 适配器（source 层）=================
@@ -276,7 +282,12 @@ def run(db_path):
         for src, ms in by_src.items():
             # 增量起点：该源里最早的"最新日期"往前 7 天重叠；akshare 期货默认拉一年多
             starts = [latest_date(conn, m["id"]) for m in ms]
-            if any(s is None for s in starts):
+            need_bf = [m for m in ms if m.get("backfill") and conn.execute(
+                "SELECT COUNT(*) FROM observations WHERE metric_id=?", (m["id"],)).fetchone()[0] < BACKFILL_MIN]
+            if need_bf:
+                start_d = date(1990, 1, 1)                # 历史回补（一次性）
+                print(f"  [{src}] 回补历史：{', '.join(m['name'] for m in need_bf)}")
+            elif any(s is None for s in starts):
                 start_d = (today - timedelta(days=430))   # 首次/有缺失：拉一年多
             else:
                 earliest = min(starts)

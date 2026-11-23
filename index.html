@@ -930,13 +930,16 @@ async function drawQvix(idx){
 }
 
 // ================== 金属模块（新增：概览分块 + 金/铜/锂走势） ==================
-const METAL_ORDER = ["gold","copper","lithium"];
+const METAL_ORDER = ["gold","silver","copper","lithium"];
+const RATIO_RANGES = [["1y","近1年"],["3y","近3年"],["5y","近5年"],["10y","近10年"],["all","全部"]];
+let metalsRatios = null, ratioRange = "10y";
 const METALS_RANGES = [["1m","近1月"],["6m","近6月"],["1y","近1年"],["all","全部"]];
 let metalsOv = null, metalsSub = "overview", metalsRange = "1y", metalsChart = null;
 
 function metalDp(unit){
   if(unit==="元/克") return 2;
-  if(unit==="美元/盎司"||unit==="万吨") return 1;
+  if(unit==="美元/盎司") return 2;
+  if(unit==="万吨") return 1;
   return 0;   // 元/吨、美元/吨
 }
 
@@ -944,6 +947,7 @@ async function selectMetals(){
   curTop="metals"; chart=null; erpCharts=[]; metalsChart=null;
   renderIndBar();
   metalsOv = await loadJSON("metals_api/overview.json");
+  metalsRatios = await loadJSON("metals_api/ratios.json").then(j=>j.ratios||{}).catch(()=>({}));
   metalsSub = "overview";
   renderMetalsSubBar();
   renderMetalsPane();
@@ -986,7 +990,42 @@ function renderMetalsOverview(pane){
     });
     html += '</div>';
   });
-  pane.innerHTML = html || '<div class="empty">暂无数据</div>';
+  pane.innerHTML = (html || '<div class="empty">暂无数据</div>') + '<div id="ratioSec"></div>';
+  renderMetalsRatio(document.getElementById("ratioSec"));
+}
+
+// —— 比价：金银比、金铜比（中性色，只描述历史位置）——
+function ratioCard(r){
+  const L=r.latest, pc=x=> x==null?"—":Math.round(x*100)+"%";
+  return '<div class="card"><div class="top"><span class="nm">'+r.name+'</span></div>'+
+    '<div><span class="val">'+L.value.toFixed(r.dp)+'</span></div>'+
+    '<div style="font-size:12.5px;margin-top:4px;color:var(--sec)">近5年百分位 '+pc(r.pct_5y)+'</div>'+
+    '<div style="font-size:12.5px;margin-top:2px;color:var(--sec)">近10年百分位 '+pc(r.pct_10y)+'</div>'+
+    '<div class="meta-line">'+L.date+'</div></div>';
+}
+function renderMetalsRatio(pane){
+  erpCharts.forEach(c=>{ try{ c&&c.dispose&&c.dispose(); }catch(e){} }); erpCharts=[];
+  const R=metalsRatios||{};
+  if(!Object.keys(R).length){ pane.innerHTML=""; return; }
+  let h='<div class="grp-title">金银比 · 金铜比</div><div class="grid">'+["gs","gc"].filter(k=>R[k]).map(k=>ratioCard(R[k])).join("")+'</div>';
+  h+='<div class="ranges" style="margin-top:14px">';
+  RATIO_RANGES.forEach(([k,l])=> h+='<span class="rg'+(k===ratioRange?" on":"")+'" data-r="'+k+'">'+l+'</span>');
+  h+='</div>';
+  ["gs","gc"].filter(k=>R[k]).forEach(k=>{
+    h+='<div class="erp-chart-title" style="margin-top:18px">'+R[k].name+'</div>'+
+       '<div class="erp-chart-sub">'+R[k].note+'；数据自 '+R[k].since.slice(0,4)+' 年起</div>'+
+       '<div class="erp-chart-sub" id="rsub_'+k+'"></div><div class="erp-chart" id="rc_'+k+'"></div>';
+  });
+  h+='<div style="font-size:12px;color:var(--muted);margin:18px 2px 0;line-height:1.7">分位线按近10年数据计算（不足10年按全部数据），不随上方时间范围变化。'+
+     '比值只描述历史位置，不做高低好坏判断，不构成任何投资建议。</div>';
+  pane.innerHTML=h;
+  pane.querySelectorAll(".rg").forEach(el=> el.onclick=()=>{ ratioRange=el.dataset.r; renderMetalsRatio(pane); });
+  const yrs={"1y":1,"3y":3,"5y":5,"10y":10,"all":null}[ratioRange];
+  ["gs","gc"].filter(k=>R[k]).forEach(k=>{
+    const r=R[k]; let pts=r.dates.map((d,i)=>({date:d,value:r.values[i]}));
+    if(yrs){ const last=new Date(r.latest.date); last.setFullYear(last.getFullYear()-yrs); const c=last.toISOString().slice(0,10); pts=pts.filter(p=>p.date>=c); }
+    drawErpQuant("rc_"+k,"rsub_"+k,r.name,k==="gs"?"#6b5bd6":"#b07a3a",pts.map(p=>p.date),pts,r.q10y,r.dp,"","近10年");
+  });
 }
 
 // —— 单金属页：走势图（同量纲同轴，不同量纲用左右双轴）——
