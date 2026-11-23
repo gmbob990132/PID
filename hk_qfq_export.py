@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 """中芯国际 00981.HK、华虹半导体 01347.HK 日线前复权收盘价（2023-11-01 至今）→ hk_qfq/
 
-来源按顺序尝试，每只股票用第一个成功的：
-  1. Tushare hk_daily_adj（港股复权行情：自带 adj_factor 时按 前复权 = 收盘 × 当日因子 ÷ 最新因子 计算）
-  2. Tushare pro_bar(asset="HK", adj="qfq")
-  3. akshare 东财 stock_hk_hist_em(adjust="qfq")（备用）
+来源（不用 Tushare）：
+  1. 东方财富 前复权日线（akshare stock_hk_hist_em, adjust="qfq"；限流时等待后重试）
+  2. 新浪财经 前复权日线（akshare stock_hk_hist_sina, adjust="qfq"）
+两个都取到时以东方财富为准，并打印两者的最大差异，方便核对。
 输出：
   hk_qfq/hk_qfq_close.csv    宽表：日期, 中芯国际, 华虹半导体（UTF-8 BOM，Excel 直接打开不乱码）
   hk_qfq/hk_qfq_close.xlsx   同内容 + 每只股票一个明细 sheet（含不复权收盘、复权因子、来源）
-用法：TUSHARE_TOKEN=xxx python3 hk_qfq_export.py
+用法：python3 hk_qfq_export.py
 """
 import os, sys
 import pandas as pd
@@ -25,69 +25,59 @@ def norm(df, date_col, close_col):
     return d.dropna().sort_values("date").drop_duplicates("date")
 
 
-def ts_hk_daily_adj(pro, code, _):
-    df = pro.hk_daily_adj(ts_code=code, start_date=START, end_date=END)
-    if df is None or df.empty:
-        raise RuntimeError("hk_daily_adj 无数据（可能没有该接口权限）")
-    print(f"    hk_daily_adj 列：{list(df.columns)}")
-    df = df.sort_values("trade_date")
-    if "adj_factor" in df.columns and df["adj_factor"].notna().any():
-        # 前复权以"区间最后一天"为基准；用全历史最新因子更严谨，区间截到今天即等价
-        f = pd.to_numeric(df["adj_factor"], errors="coerce")
-        df["qfq"] = pd.to_numeric(df["close"], errors="coerce") * f / f.iloc[-1]
-        out = norm(df, "trade_date", "qfq")
-        raw = df[["trade_date", "close", "adj_factor"]].copy()
-        return out, raw
-    for c in ("close_qfq", "qfq_close"):
-        if c in df.columns:
-            return norm(df, "trade_date", c), df
-    raise RuntimeError("hk_daily_adj 返回里没有复权因子或前复权价")
-
-
-def ts_pro_bar(pro, code, _):
-    import tushare as ts
-    df = ts.pro_bar(ts_code=code, asset="HK", adj="qfq", start_date=START, end_date=END, api=pro)
-    if df is None or df.empty:
-        raise RuntimeError("pro_bar 无数据")
-    return norm(df, "trade_date", "close"), df
-
-
-def ak_em(_, __, sym):
+def ak_em(sym):
+    import time
     import akshare as ak
     fn = getattr(ak, "stock_hk_hist_em", None) or getattr(ak, "stock_hk_hist")
-    df = fn(symbol=sym, period="daily", start_date=START, end_date=END, adjust="qfq")
+    for k in range(3):
+        try:
+            df = fn(symbol=sym, period="daily", start_date=START, end_date=END, adjust="qfq")
+            if df is None or df.empty:
+                raise RuntimeError("东财无数据")
+            return norm(df, "日期", "收盘"), df
+        except Exception as e:  # noqa: BLE001
+            if k == 2:
+                raise
+            print(f"    东财第 {k + 1} 次失败（{type(e).__name__}），{60 * (k + 1)} 秒后重试")
+            time.sleep(60 * (k + 1))
+
+
+def ak_sina(sym):
+    import akshare as ak
+    df = ak.stock_hk_hist_sina(symbol=sym, period="daily", adjust="qfq")
     if df is None or df.empty:
-        raise RuntimeError("东财无数据")
-    return norm(df, "日期", "收盘"), df
+        raise RuntimeError("新浪无数据")
+    dc = next(c for c in df.columns if str(c).lower() in ("date", "日期"))
+    cc = next(c for c in df.columns if str(c).lower() in ("close", "收盘"))
+    s = norm(df, dc, cc)
+    s = s[(s["date"] >= f"{START[:4]}-{START[4:6]}-{START[6:]}")]
+    return s, df
 
 
 def main():
-    tok = os.environ.get("TUSHARE_TOKEN")
-    pro = None
-    if tok:
-        import tushare as ts
-        pro = ts.pro_api(tok)
-    else:
-        print("未设置 TUSHARE_TOKEN，只用 akshare 备用来源")
     os.makedirs(OUT, exist_ok=True)
     wide, details = None, {}
     for code, sym, name in STOCKS:
-        got = None
-        for label, fn in (("tushare hk_daily_adj", ts_hk_daily_adj), ("tushare pro_bar qfq", ts_pro_bar), ("akshare 东财 qfq", ak_em)):
-            if label.startswith("tushare") and pro is None:
-                continue
+        res = {}
+        for label, fn in (("东方财富 前复权", ak_em), ("新浪 前复权", ak_sina)):
             try:
-                s, raw = fn(pro, code, sym)
+                s, raw = fn(sym)
                 if len(s) < 20:
                     raise RuntimeError(f"只有 {len(s)} 行")
-                got = (label, s, raw)
+                res[label] = (s, raw)
                 print(f"✓ {name} {code}：{label}，{len(s)} 行，{s['date'].iloc[0]} ~ {s['date'].iloc[-1]}，最新前复权收盘 {s['close_qfq'].iloc[-1]:.3f}")
-                break
             except Exception as e:  # noqa: BLE001
                 print(f"  ✗ {name} {label}：{type(e).__name__} {str(e)[:160]}")
-        if not got:
+        if not res:
             print(f"!! {name} 所有来源都失败"); continue
-        label, s, raw = got
+        if len(res) == 2:
+            a_, b_ = [v[0].set_index("date")["close_qfq"] for v in res.values()]
+            j = a_.to_frame("a").join(b_.to_frame("b"), how="inner")
+            if len(j):
+                rel = ((j["a"] - j["b"]).abs() / j["b"]).max()
+                print(f"    两个来源共同 {len(j)} 天，最大相对差异 {rel:.4%}")
+        label = next(iter(res))
+        s, raw = res[label]
         s = s.rename(columns={"close_qfq": name})
         wide = s if wide is None else wide.merge(s, on="date", how="outer")
         raw = raw.copy(); raw["来源"] = label
