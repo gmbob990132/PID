@@ -1,13 +1,10 @@
 name: sync-cos
 # 把对外版（public 分支）同步到腾讯云香港 COS（CDN 回源用）。
-# 触发：publish-public 跑完后自动同步 / 手动运行。MD5 相同的文件会跳过，所以无变化时几乎不耗时间。
+# 触发：仅手动（自动同步已并入 publish-public，这里作为补救）。MD5 相同的文件会跳过，所以无变化时几乎不耗时间。
 # 需要在仓库 Settings → Secrets and variables → Actions 里配置 4 个 secrets：
 #   COS_SECRET_ID、COS_SECRET_KEY（子账号密钥，只给这个存储桶的写权限）、COS_BUCKET（形如 invest-board-1250000000）、COS_REGION（ap-hongkong）
 on:
-  workflow_run:
-    workflows: [publish-public]
-    types: [completed]
-  workflow_dispatch: {}
+  workflow_dispatch: {}      # 只留手动：自动同步已并入 publish-public
 permissions:
   contents: read
 concurrency:

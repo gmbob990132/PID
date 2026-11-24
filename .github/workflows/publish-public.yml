@@ -1,6 +1,8 @@
 name: publish-public
 # 把"不含技术指标分析"的公开版站点发布到本仓库的 public 分支（每次覆盖成单个提交，仓库不会变大）。
 # 触发：index.html 改动 / 各数据工作流跑完 / 每 30 分钟兜底 / 手动
+# 推送 public 分支后，直接在同一个任务里同步到腾讯云 COS（board.chengandata.com 的源站），
+# 不再依赖 sync-cos 的自动连锁触发（那条链容易断）。sync-cos 保留为手动补救。
 on:
   push:
     branches: [main]
@@ -33,3 +35,24 @@ jobs:
           git add -A
           git commit -q -m "public site $(TZ=Asia/Shanghai date '+%F %H:%M')"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" public
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 同步到腾讯云 COS
+        env:
+          COS_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          COS_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+          COS_BUCKET: ${{ secrets.COS_BUCKET }}
+          COS_REGION: ${{ secrets.COS_REGION }}
+        run: |
+          if [ -z "$COS_SECRET_ID" ] || [ -z "$COS_SECRET_KEY" ] || [ -z "$COS_BUCKET" ]; then
+            echo "::error::缺少 COS_* secrets"; exit 1
+          fi
+          pip install coscmd --quiet
+          cd dist
+          rm -rf .git
+          test -f index.html || { echo "dist 里没有 index.html，停止"; exit 1; }
+          coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "${COS_REGION:-ap-hongkong}"
+          if [ -d vendor ]; then coscmd upload -r -s -H '{"Cache-Control":"max-age=31536000"}' vendor /vendor/; fi
+          coscmd upload -r -s --delete -f --ignore ".nojekyll" -H '{"Cache-Control":"max-age=300"}' . /
+          echo "COS 同步完成 $(TZ=Asia/Shanghai date '+%F %H:%M')"
