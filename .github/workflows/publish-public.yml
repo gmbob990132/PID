@@ -54,5 +54,18 @@ jobs:
           test -f index.html || { echo "dist 里没有 index.html，停止"; exit 1; }
           coscmd config -a "$COS_SECRET_ID" -s "$COS_SECRET_KEY" -b "$COS_BUCKET" -r "${COS_REGION:-ap-hongkong}"
           if [ -d vendor ]; then coscmd upload -r -s -H '{"Cache-Control":"max-age=31536000"}' vendor /vendor/; fi
-          coscmd upload -r -s --delete -f --ignore ".nojekyll" -H '{"Cache-Control":"max-age=300"}' . /
+          coscmd upload -r -s --delete -f --ignore ".nojekyll" -H '{"Cache-Control":"max-age=300"}' . / 2>&1 | tee /tmp/cos.log
+          # 有文件真正上传/删除时才刷新 CDN（目录刷新每天有配额）
+          if grep -Eq '^[1-9][0-9]* files (uploaded|sync deleted)' /tmp/cos.log; then echo "COS_CHANGED=1" >> "$GITHUB_ENV"; fi
           echo "COS 同步完成 $(TZ=Asia/Shanghai date '+%F %H:%M')"
+      - name: 刷新腾讯云 CDN 缓存
+        if: env.COS_CHANGED == '1'
+        continue-on-error: true      # 刷新失败（比如密钥没有 CDN 权限）不影响已完成的同步
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.COS_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.COS_SECRET_KEY }}
+        run: |
+          pip install tccli --quiet
+          tccli cdn PurgePathCache --region ap-guangzhou --cli-unfold-argument \
+            --Paths https://board.chengandata.com/ --FlushType flush
+          echo "CDN 目录刷新已提交 $(TZ=Asia/Shanghai date '+%F %H:%M')"
