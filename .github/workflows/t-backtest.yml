@@ -1,0 +1,27 @@
+name: t-backtest
+# 做T 第二步：用重点股历史日线回测规则（只读，不写库；结果在日志里，明细作为附件下载）
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: '回测年数'
+        default: '10'
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install tushare pandas numpy six --quiet
+      - run: python3 t_backtest.py --years "${{ github.event.inputs.years || '10' }}"
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TUSHARE_MAX_CALLS_PER_MIN: '45'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t-backtest-result
+          path: t_backtest_out/
