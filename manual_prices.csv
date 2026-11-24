@@ -1,3 +1,9 @@
 metric_id,date,value
 al_anode,2026-08-14,4680
 al_anode,2026-08-21,4650
+al_spot_east,2026-11-20,22340
+al_spot_south,2026-11-20,22940
+al_spot_central,2026-11-20,22240
+al_spot_east,2026-11-23,22600
+al_spot_south,2026-11-23,23170
+al_spot_central,2026-11-23,22490
