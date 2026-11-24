@@ -20,6 +20,7 @@
   python3 t_backtest.py                 # 调参组：调参段详表 + 检验段汇总
   python3 t_backtest.py --final         # 另外计算保留集（只在最后检验时用）
   python3 t_backtest.py --demo          # 合成数据离线自检
+第 5、6 部分（模拟收益、资金占用）见 t_pnl.py。
 """
 import argparse
 import json
@@ -34,6 +35,7 @@ import numpy as np
 import pandas as pd
 
 import t_rules as R
+import t_pnl
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STOCKS_CSV = os.path.join(HERE, "tech_config", "stocks.csv")
@@ -256,25 +258,35 @@ def report(all_d, lines, final):
             star = "★" if R.is_core(c) else "☆"
             p(f"  {star} {c[1]:<30} 满足 {len(yes):>5} 次 | 当日保守 {parts[0]} | 3日内 {parts[1]}")
     p()
-    p("## 4. 各段对比：基准 vs 达到提示门槛（第一档；格式 = 当日保守 / 3日内，括号里是成交笔数）")
+    p("## 4. 各段对比：基准 vs 强信号（≥门槛）vs 一般信号（≥门槛-1）")
+    p("  第一档支撑压力；格式 = 当日保守 / 3日内，括号里是成交笔数；'每股每年' = 平均每只股票每年成交几次")
     segs = [("调参段 全部", tune),
             ("检验段 重点", d[(d["grp"] == "重点") & (d["date"] >= SPLIT)]),
             ("检验段 非重点", d[(d["grp"] == "非重点") & (d["date"] >= SPLIT)])]
     if final:
         segs.append(("保留集 全部年份", d[d["grp"] == "保留集"]))
+    tot = {}
     for (tr, side), conds in rules.items():
         col = "buy" if side == "正T" else "sell"
         k = k_threshold(conds)
-        p(f"\n  ### {tr} · {side}（门槛 ≥{k} 条）")
+        p(f"\n  ### {tr} · {side}（强 ≥{k} 条，一般 ≥{max(1, k - 1)} 条）")
         for name, seg in segs:
             s = seg[seg["trend"] == tr]
             if s.empty:
                 continue
-            b0, b1 = block(s, col), block(s[s[f"{col}_hits"] >= k], col)
-            p(f"  {name:<12} 基准 {pct(b0['cons'])} / {pct(b0['d3'])} ({b0['nf']:>5})   "
-              f"达门槛 {pct(b1['cons'])} / {pct(b1['d3'])} ({b1['nf']:>4})   "
-              f"提升 {((b1['cons'] - b0['cons']) * 100) if b1['nf'] else float('nan'):+.1f}pt / "
-              f"{((b1['d3'] - b0['d3']) * 100) if b1['nf'] else float('nan'):+.1f}pt")
+            years = max(seg.groupby("code")["date"].agg(lambda x: (x.max() - x.min()).days / 365.25).sum(), 1e-9)
+            b0 = block(s, col)
+            line = f"  {name:<12} 基准 {pct(b0['cons'])}/{pct(b0['d3'])}"
+            for lab, kk in (("强", k), ("一般", max(1, k - 1))):
+                b = block(s[s[f"{col}_hits"] >= kk], col)
+                up = (f"{(b['cons'] - b0['cons']) * 100:+.1f}/{(b['d3'] - b0['d3']) * 100:+.1f}" if b["nf"] else "—")
+                line += (f" │ {lab} {pct(b['cons'])}/{pct(b['d3'])} 提升{up}pt"
+                         f" ({b['nf']}笔, 每股每年{b['nf'] / years:.1f})")
+                tot.setdefault((name, lab), [0, years])[0] += b["nf"]
+            p(line)
+    p("\n  合计（六格加总）：")
+    for (name, lab), (n, years) in tot.items():
+        p(f"  {name:<12} {lab:<3} 成交 {n:>6} 笔   每股每年 {n / years:5.1f} 次")
 
 
 def main():
@@ -302,7 +314,7 @@ def main():
     print(f"股票 {len(stocks)} 只 {cnt}；保留集 {nh} 只{'（本次参与）' if a.final else '（本次不取数、不计算）'}")
     print(f"取 {start} → {end} 前复权日线 …\n")
 
-    frames, fails = [], []
+    frames, fails, pnl_frames = [], [], []
     for code, name, grp in stocks:
         try:
             raw = fetch_demo(code, s8, e8) if a.demo else (fetch_hk(code, s8, e8) if code.endswith(".HK")
@@ -316,6 +328,7 @@ def main():
             d = d[d["date"] >= cut].copy()
             d["code"], d["name"], d["grp"] = code, name, grp
             frames.append(d)
+            pnl_frames.append((code, grp, d.reset_index(drop=True)))
             print(f"  ✓ [{grp}] {code} {name}  {len(raw)} 根，回测 {len(d)} 天", flush=True)
         except Exception as e:  # noqa: BLE001
             fails.append(code)
@@ -331,6 +344,24 @@ def main():
              f"规则第 {VER} 版；调参段 = 2016–2022，检验段 = 2023 以后。", ""]
     print("\n".join(lines))
     report(all_d, lines, a.final)
+
+    def p(x=""):
+        print(x)
+        lines.append(x)
+    print("\n模拟交易中 …", flush=True)
+    trades = t_pnl.simulate(pnl_frames, R.RULESETS[VER])
+    segs = [("调参段 全部", lambda t: (t["grp"] != "保留集") & (t["sig_date"] < SPLIT),
+             lambda d, g: (d["date"] < SPLIT) if g != "保留集" else d["date"] < pd.Timestamp("1900-01-01")),
+            ("检验段 重点", lambda t: (t["grp"] == "重点") & (t["sig_date"] >= SPLIT),
+             lambda d, g: (d["date"] >= SPLIT) if g == "重点" else d["date"] < pd.Timestamp("1900-01-01")),
+            ("检验段 非重点", lambda t: (t["grp"] == "非重点") & (t["sig_date"] >= SPLIT),
+             lambda d, g: (d["date"] >= SPLIT) if g == "非重点" else d["date"] < pd.Timestamp("1900-01-01"))]
+    if a.final:
+        segs.append(("保留集 全部年份", lambda t: t["grp"] == "保留集",
+                     lambda d, g: d["date"].notna() if g == "保留集" else d["date"] < pd.Timestamp("1900-01-01")))
+    t_pnl.pnl_report(trades, pnl_frames, segs, p)
+    t_pnl.capital_report(trades, pnl_frames, p, "重点")
+    trades.to_csv(os.path.join(OUT_DIR, "trades.csv.gz"), index=False, encoding="utf-8-sig", compression="gzip")
     if fails:
         lines.append(f"\n取数失败：{', '.join(fails)}")
         print(lines[-1])
