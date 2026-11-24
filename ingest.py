@@ -160,8 +160,11 @@ def adapter_mysteel_flash(metrics):
         d = datetime.fromtimestamp(ms / 1000, tz=CN_TZ).date().isoformat() if ms \
             else datetime.now(CN_TZ).date().isoformat()
         parsed = _parse_flash(content, d)
-        if not parsed and '铝锭' in content and not _SELFTEST:
-            print(f"    [mysteel 未解析] {d} {content[:120]}")
+        if not parsed and not _SELFTEST and '短评' not in content[:40]:
+            _recent = (datetime.now(CN_TZ).date() - date.fromisoformat(d)).days <= 6
+            if '铝锭' in content or _recent:
+                _txt = re.sub(r'<[^>]+>', ' ', content)
+                print(f"    [mysteel 未解析] {d} {_txt[:100]}")
         for metric_id, value, src_change in parsed:
             obs.append({"metric_id": metric_id, "obs_date": d, "value": value,
                         "src_change": src_change, "source": "mysteel_openapi"})
