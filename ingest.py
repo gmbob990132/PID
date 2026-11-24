@@ -62,14 +62,14 @@ METRICS = [
 ]
 
 _MY_URL = ("https://openapi.mysteel.com/without_sign/newsflash/flashnews/query_by_tags.htm"
-           "?advertisementFlag=0&keyword=&pageNo=1&pageSize=30&sortByScore=false"
+           "?advertisementFlag=0&keyword=&pageNo=1&pageSize=100&sortByScore=false"
            "&columnIds=%255B%255B2%252C84%252C584%255D%255D&breedTagId=4437")
 _MY_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                              "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                "Referer": "https://www.mysteel.com/fastcomment/",
                "Accept": "application/json, text/plain, */*"}
-_REGION_RE = re.compile(r'(华东|华南|华北|中原|西南|西北|东北)\s*([\d]+(?:\.\d+)?)\s*(?:元/吨)?\s*[，,]\s*'
-                        r'(涨|跌|平|持平|稳)\s*([\d]+(?:\.\d+)?)?')
+_REGION_RE = re.compile(r'(华东|华南|华北|中原|西南|西北|东北)(?:地区)?(?:现货)?(?:均价|价格)?\s*[:：]?\s*([\d]+(?:\.\d+)?)\s*(?:元/吨)?\s*[，,；;、\s]?\s*'
+                        r'(上涨|下跌|涨|跌|平|持平|稳)?\s*([\d]+(?:\.\d+)?)?')
 _INV_TOTAL_RE = re.compile(r'库存总量为\s*([\d.]+)\s*万吨')
 _INV_CHANGE_RE = re.compile(r'较上期数据\s*(增加|减少|下降|持平)?\s*([\d.]+)?\s*万吨')
 _REGION_TO_METRIC = {"华东": "al_spot_east", "华南": "al_spot_south", "中原": "al_spot_central"}
@@ -104,13 +104,14 @@ def _find_items(obj):
 
 def _parse_flash(content, obs_date):
     out = []
-    if '铝锭价格行情' in content:
+    if ('铝锭' in content and ('价格行情' in content or '现货价格' in content or '均价' in content)
+            and _REGION_RE.search(content)):
         for region, price, direction, amt in _REGION_RE.findall(content):
             mid = _REGION_TO_METRIC.get(region)
             if not mid:
                 continue
             chg = float(amt) if amt else 0.0
-            if direction == '跌':
+            if direction in ('跌', '下跌'):
                 chg = -chg
             elif direction in ('平', '持平', '稳'):
                 chg = 0.0
@@ -157,7 +158,10 @@ def adapter_mysteel_flash(metrics):
         ms = it.get('publisherTime')
         d = datetime.fromtimestamp(ms / 1000, tz=CN_TZ).date().isoformat() if ms \
             else datetime.now(CN_TZ).date().isoformat()
-        for metric_id, value, src_change in _parse_flash(content, d):
+        parsed = _parse_flash(content, d)
+        if not parsed and '铝锭' in content and not _SELFTEST:
+            print(f"    [mysteel 未解析] {d} {content[:120]}")
+        for metric_id, value, src_change in parsed:
             obs.append({"metric_id": metric_id, "obs_date": d, "value": value,
                         "src_change": src_change, "source": "mysteel_openapi"})
     return obs
