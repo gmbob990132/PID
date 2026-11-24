@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T05:37:32+00:00",
+  "generated_at": "2026-11-24T05:54:06+00:00",
   "metric": {
     "id": "al_spot_east",
     "name": "现货·华东",
@@ -10,63 +10,9 @@
   "range": "recent",
   "points": [
     {
-      "date": "2026-10-08",
-      "value": 23760.0,
-      "change": -270.0,
-      "src_change": -270.0
-    },
-    {
-      "date": "2026-10-09",
-      "value": 23660.0,
-      "change": -100.0,
-      "src_change": -100.0
-    },
-    {
-      "date": "2026-10-12",
-      "value": 23810.0,
-      "change": 150.0,
-      "src_change": 150.0
-    },
-    {
-      "date": "2026-10-13",
-      "value": 23720.0,
-      "change": -90.0,
-      "src_change": -90.0
-    },
-    {
-      "date": "2026-10-14",
-      "value": 23620.0,
-      "change": -100.0,
-      "src_change": -100.0
-    },
-    {
-      "date": "2026-10-15",
-      "value": 23270.0,
-      "change": -350.0,
-      "src_change": -350.0
-    },
-    {
-      "date": "2026-10-16",
-      "value": 23470.0,
-      "change": 200.0,
-      "src_change": 200.0
-    },
-    {
-      "date": "2026-10-19",
-      "value": 23650.0,
-      "change": 180.0,
-      "src_change": 180.0
-    },
-    {
-      "date": "2026-10-20",
-      "value": 23530.0,
-      "change": -120.0,
-      "src_change": -120.0
-    },
-    {
       "date": "2026-10-21",
       "value": 23610.0,
-      "change": 80.0,
+      "change": null,
       "src_change": 80.0
     },
     {
@@ -194,6 +140,12 @@
       "value": 22280.0,
       "change": -260.0,
       "src_change": -260.0
+    },
+    {
+      "date": "2026-11-24",
+      "value": 22640.0,
+      "change": 360.0,
+      "src_change": 40.0
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-24T05:37:32+00:00",
+  "generated_at": "2026-11-24T05:54:06+00:00",
   "modules": [
     {
       "id": "aluminum",
@@ -17,7 +17,7 @@
           "category": "price",
           "unit": "元/吨",
           "source_type": "api",
-          "source_ref": "mysteel_flash",
+          "source_ref": "mysteel_lv_table",
           "update_freq": "daily",
           "hide_overview": false,
           "hide_chart": false
@@ -28,7 +28,7 @@
           "category": "price",
           "unit": "元/吨",
           "source_type": "api",
-          "source_ref": "mysteel_flash",
+          "source_ref": "mysteel_lv_table",
           "update_freq": "daily",
           "hide_overview": false,
           "hide_chart": false
@@ -39,7 +39,7 @@
           "category": "price",
           "unit": "元/吨",
           "source_type": "api",
-          "source_ref": "mysteel_flash",
+          "source_ref": "mysteel_lv_table",
           "update_freq": "daily",
           "hide_overview": false,
           "hide_chart": false
