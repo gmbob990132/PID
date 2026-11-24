@@ -28,13 +28,13 @@ MODULE = {"id": "aluminum", "name": "电解铝", "sort_order": 1}
 METRICS = [
     {"id": "al_spot_east",    "name": "现货·华东", "category": "price",     "unit": "元/吨",
      "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "A00", "region": ["上海", "无锡", "杭州", "华东"]}},
+     "params": {"name": "A00铝锭", "region": "华东", "box": "ltk"}},
     {"id": "al_spot_south",   "name": "现货·华南", "category": "price",     "unit": "元/吨",
      "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "A00", "region": ["佛山", "南海", "广东", "广州", "华南"]}},
+     "params": {"name": "A00铝锭", "region": "华南", "box": "ltk"}},
     {"id": "al_spot_central", "name": "现货·中原", "category": "price",     "unit": "元/吨",
      "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "A00", "region": ["巩义", "郑州", "河南", "洛阳", "中原"]}},
+     "params": {"name": "A00铝锭", "region": "中原", "box": "ltk"}},
     {"id": "al_social_inv",   "name": "社会库存",  "category": "inventory", "unit": "万吨",
      "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "biweekly"},
     {"id": "al_futures_main", "name": "沪铝主力", "category": "price", "unit": "元/吨",
@@ -360,6 +360,16 @@ def adapter_akshare_spot_price_daily(metrics):
     return out
 
 
+def _md_to_iso(md, today):
+    """'11-24' → 'YYYY-11-24'，跨年保护。"""
+    try:
+        mm, dd = md.split('-')
+        y = today.year - (1 if int(mm) - today.month > 6 else 0)
+        return f"{y}-{int(mm):02d}-{int(dd):02d}"
+    except Exception:
+        return today.isoformat()
+
+
 def adapter_mysteel_lv_table(metrics):
     """抓 lv.mysteel.com 首页价格表，按品名取（氧化铝/预焙阳极）。日期补全年份。"""
     if _SELFTEST:
@@ -396,10 +406,33 @@ def adapter_mysteel_lv_table(metrics):
         if 't1' in cells and 't3' in cells:
             parsed.append(cells)
 
+    # 「今日价格」框：<td class="ltk-t1">品名 / ltk-t2 地区 / ltk-t3 价格 / ltk-t4 涨跌 / ltk-t5 单位 / ltk-t6 日期
+    ltk_rows = []
+    ltk_cell_re = re.compile(r'<td[^>]*class="ltk-t(\d)[^"]*"[^>]*>(.*?)</td>', re.S)
+    for tr in row_re.findall(html):
+        cells = {('t' + n): re.sub(r'<[^>]+>', '', v).strip() for n, v in ltk_cell_re.findall(tr)}
+        if 't1' in cells and 't3' in cells:
+            ltk_rows.append(cells)
+
     today = datetime.now(CN_TZ).date()
     out = []
     for m in metrics:
         want = m["params"]["name"]
+        if m["params"].get("box") == "ltk":
+            rw = m["params"].get("region")
+            hit = next((c for c in ltk_rows if c['t1'] == want and c.get('t2') == rw), None)
+            if not hit:
+                print(f"    [lv 今日价格 未找到] {m['name']} 要 {want}/{rw}；框里有：" +
+                      str(sorted({c['t1'] + '/' + c.get('t2', '') for c in ltk_rows})))
+                continue
+            try:
+                chg = float(re.sub(r'[^0-9.\-]', '', hit.get('t4', '')))
+            except Exception:
+                chg = None
+            out.append({"metric_id": m["id"], "obs_date": _md_to_iso(hit.get('t6', ''), today),
+                        "value": float(hit['t3'].replace(',', '')), "src_change": chg,
+                        "source": "mysteel_lv_today/" + want + "/" + rw})
+            continue
         region_want = m["params"].get("region")
         pick = None
         regions = region_want if isinstance(region_want, list) else [region_want]
