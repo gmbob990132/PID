@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-做T 回测（第三版）
+做T 回测（第四版规则）
 
 股票分三组（tech_config/stocks.csv + tech_config/t_holdout.csv）：
   调参组   = 39 只重点股 + 非重点股中除保留集外的其余股票
   保留集   = t_holdout.csv 里随机抽出的 30 只非重点股：平时完全不看，只有加 --final 才计算和输出
 时间切分：2016–2022 = 调参段；2023 以后 = 检验段
 
-规则：t_rules.RULES_V3。命中数只数"核心"条件；"候选"条件照样计算、单独报告增益，等数据多了再定去留。
+规则：t_rules.RULES_V4（第三版的条件不变，只调整了核心/候选）。命中数只数"核心"条件；"候选"条件照样计算、单独报告增益，等数据多了再定去留。
 支撑/压力两档：第一档 = 离收盘最近的价位（≥0.3%）；第二档 = 至少离收盘 0.5 个 ATR。
 
 检验口径（成交以"第二天"价格为准）：
@@ -43,7 +43,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 GAIN_OPT, GAIN_CONS = 0.015, 0.005
 SPLIT = pd.Timestamp("2023-01-01")
-VER = 3
+VER = 4
 
 
 # ---------------- 数据 ----------------
@@ -80,29 +80,38 @@ def fetch_a(code, start, end):
 
 
 def fetch_hk(code, start, end):
+    """腾讯港股前复权日线。两个域名轮流试、失败退避重试（Actions 上偶发 DNS 解析失败/限流）"""
     bare = code.split(".")[0].lstrip("0").zfill(5)
     d0 = pd.Timestamp(start).date()
     d1 = pd.Timestamp(end).date()
     rows, cur = [], d0
+    hosts = ["web.ifzq.gtimg.cn", "ifzq.gtimg.cn"]
     while cur <= d1:
         nxt = min(cur + timedelta(days=900), d1)
-        url = (f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=hk{bare},day,"
-               f"{cur.isoformat()},{nxt.isoformat()},800,qfq")
-        for attempt in range(3):
+        js, last = None, None
+        for attempt in range(6):
+            host = hosts[attempt % 2]
+            url = (f"https://{host}/appstock/app/fqkline/get?param=hk{bare},day,"
+                   f"{cur.isoformat()},{nxt.isoformat()},800,qfq")
             try:
-                with urlopen(Request(url, headers={"User-Agent": UA}), timeout=20) as r:
+                with urlopen(Request(url, headers={"User-Agent": UA, "Referer": "https://gu.qq.com/"}),
+                             timeout=20) as r:
                     js = json.loads(r.read().decode("utf-8", "replace"))
+                if js.get("code") not in (0, "0", None):
+                    raise RuntimeError(f"腾讯返回 code={js.get('code')} msg={js.get('msg')}")
                 break
-            except Exception:  # noqa: BLE001
-                if attempt == 2:
-                    raise
-                time.sleep(3)
+            except Exception as e:  # noqa: BLE001
+                last, js = e, None
+                time.sleep(2 * (attempt + 1))
+        if js is None:
+            raise RuntimeError(f"腾讯港股日线 6 次都失败：{type(last).__name__}: {str(last)[:100]}")
         node = (js.get("data") or {}).get(f"hk{bare}") or {}
         for x in node.get("qfqday") or node.get("day") or []:
             if len(x) >= 6:
                 rows.append({"date": pd.to_datetime(x[0]), "open": float(x[1]), "close": float(x[2]),
                              "high": float(x[3]), "low": float(x[4]), "vol": float(x[5])})
         cur = nxt + timedelta(days=1)
+        time.sleep(0.5)
     if not rows:
         return pd.DataFrame()
     return pd.DataFrame(rows).drop_duplicates("date").sort_values("date").reset_index(drop=True)

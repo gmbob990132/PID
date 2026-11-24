@@ -316,8 +316,17 @@ RULES_V3 = {
         _c("pos", "靠近压力（位置>2/3）", lambda d: d["pos"] > P["pos_high"], core=False),
     ],
 }
-RULES = RULES_V3          # 每日计算默认用第三版
-RULESETS = {1: RULES_V1, 2: RULES_V2, 3: RULES_V3}
+# ---- 第四版：只改"核心/候选"标记（依据 129 只股票 2016–2022 调参段的单条增益）
+# ----   上涨正T：MACD 在零轴上方 → 候选（上涨趋势里几乎天天满足，没有区分度）；靠近支撑 → 核心
+# ----   上涨反T：放量+长上影 → 核心；震荡正T：靠近支撑 → 核心；震荡反T：靠近压力 → 核心
+_V4_CORE = {("上涨", "正T"): {"macd": False, "pos3": True},
+            ("上涨", "反T"): {"vol": True},
+            ("震荡", "正T"): {"pos": True},
+            ("震荡", "反T"): {"pos": True}}
+RULES_V4 = {cell: [(c[0], c[1], c[2], _V4_CORE.get(cell, {}).get(c[0], c[3])) for c in conds]
+            for cell, conds in RULES_V3.items()}
+RULES = RULES_V4          # 每日计算默认用第四版
+RULESETS = {1: RULES_V1, 2: RULES_V2, 3: RULES_V3, 4: RULES_V4}
 
 
 def is_core(cond):
