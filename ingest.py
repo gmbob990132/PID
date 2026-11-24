@@ -27,11 +27,14 @@ _SELFTEST = False
 MODULE = {"id": "aluminum", "name": "电解铝", "sort_order": 1}
 METRICS = [
     {"id": "al_spot_east",    "name": "现货·华东", "category": "price",     "unit": "元/吨",
-     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "daily"},
+     "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
+     "params": {"name": "A00", "region": ["上海", "无锡", "杭州", "华东"]}},
     {"id": "al_spot_south",   "name": "现货·华南", "category": "price",     "unit": "元/吨",
-     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "daily"},
+     "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
+     "params": {"name": "A00", "region": ["佛山", "南海", "广东", "广州", "华南"]}},
     {"id": "al_spot_central", "name": "现货·中原", "category": "price",     "unit": "元/吨",
-     "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "daily"},
+     "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
+     "params": {"name": "A00", "region": ["巩义", "郑州", "河南", "洛阳", "中原"]}},
     {"id": "al_social_inv",   "name": "社会库存",  "category": "inventory", "unit": "万吨",
      "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "biweekly"},
     {"id": "al_futures_main", "name": "沪铝主力", "category": "price", "unit": "元/吨",
@@ -104,12 +107,15 @@ def _find_items(obj):
 
 def _parse_flash(content, obs_date):
     out = []
-    if ('铝锭' in content and ('价格行情' in content or '现货价格' in content or '均价' in content)
-            and _REGION_RE.search(content)):
+    content = re.sub(r'<[^>]+>', ' ', content)
+    if _REGION_RE.search(content):
+        seen = set()
         for region, price, direction, amt in _REGION_RE.findall(content):
             mid = _REGION_TO_METRIC.get(region)
-            if not mid:
+            # 只认铝价量级（1万~4万元/吨），避免把库存、产量等数字误当价格
+            if not mid or mid in seen or not (10000 <= float(price) <= 40000):
                 continue
+            seen.add(mid)
             chg = float(amt) if amt else 0.0
             if direction in ('跌', '下跌'):
                 chg = -chg
@@ -164,7 +170,7 @@ def adapter_mysteel_flash(metrics):
             _recent = (datetime.now(CN_TZ).date() - date.fromisoformat(d)).days <= 6
             if '铝锭' in content or _recent:
                 _txt = re.sub(r'<[^>]+>', ' ', content)
-                print(f"    [mysteel 未解析] {d} {_txt[:100]}")
+                print(f"    [mysteel 未解析] {d} keys={sorted(it.keys())} {_txt[:600]}")
         for metric_id, value, src_change in parsed:
             obs.append({"metric_id": metric_id, "obs_date": d, "value": value,
                         "src_change": src_change, "source": "mysteel_openapi"})
@@ -396,11 +402,17 @@ def adapter_mysteel_lv_table(metrics):
         want = m["params"]["name"]
         region_want = m["params"].get("region")
         pick = None
-        for c in parsed:
-            if want in c['t1'][0] and (region_want is None or region_want in c.get('t2', [''])[0]):
-                pick = c
+        regions = region_want if isinstance(region_want, list) else [region_want]
+        for rw in regions:                      # 按候选城市顺序找第一个匹配
+            for c in parsed:
+                if want in c['t1'][0] and (rw is None or rw in c.get('t2', [''])[0]):
+                    pick = c
+                    break
+            if pick:
                 break
         if not pick:
+            al_rows = sorted({c['t1'][0] + "/" + c.get('t2', [''])[0] for c in parsed if '铝' in c['t1'][0]})
+            print(f"    [lv 未找到] {m['name']} 要 {want}@{regions}；表里含铝的行：{al_rows}")
             continue
         price = pick['t3'][0].replace(',', '')
         chg_raw = pick['t3'][1] if len(pick['t3']) > 1 else pick.get('t4', [''])[0]
