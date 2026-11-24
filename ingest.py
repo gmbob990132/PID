@@ -28,13 +28,16 @@ MODULE = {"id": "aluminum", "name": "电解铝", "sort_order": 1}
 METRICS = [
     {"id": "al_spot_east",    "name": "现货·华东", "category": "price",     "unit": "元/吨",
      "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "A00铝锭", "region": "华东", "box": "ltk"}},
+     "params": {"name": "A00铝锭", "region": "华东", "box": "ltk",
+                "url": "https://dianjielv.mysteel.com/"}},
     {"id": "al_spot_south",   "name": "现货·华南", "category": "price",     "unit": "元/吨",
      "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "A00铝锭", "region": "华南", "box": "ltk"}},
+     "params": {"name": "A00铝锭", "region": "华南", "box": "ltk",
+                "url": "https://dianjielv.mysteel.com/"}},
     {"id": "al_spot_central", "name": "现货·中原", "category": "price",     "unit": "元/吨",
      "source_type": "api",  "source_ref": "mysteel_lv_table", "update_freq": "daily",
-     "params": {"name": "A00铝锭", "region": "中原", "box": "ltk"}},
+     "params": {"name": "A00铝锭", "region": "中原", "box": "ltk",
+                "url": "https://dianjielv.mysteel.com/"}},
     {"id": "al_social_inv",   "name": "社会库存",  "category": "inventory", "unit": "万吨",
      "source_type": "api",  "source_ref": "mysteel_flash", "update_freq": "biweekly"},
     {"id": "al_futures_main", "name": "沪铝主力", "category": "price", "unit": "元/吨",
@@ -371,13 +374,29 @@ def _md_to_iso(md, today):
 
 
 def adapter_mysteel_lv_table(metrics):
-    """抓 lv.mysteel.com 首页价格表，按品名取（氧化铝/预焙阳极）。日期补全年份。"""
+    """按 params.url 分组抓 Mysteel 页面（默认 lv.mysteel.com），一个页面失败不影响另一个。"""
     if _SELFTEST:
         return []
-    url = "https://lv.mysteel.com/"
+    groups = {}
+    for m in metrics:
+        groups.setdefault(m["params"].get("url", "https://lv.mysteel.com/"), []).append(m)
+    out, errs = [], []
+    for url, ms in groups.items():
+        try:
+            out += _mysteel_page_table(ms, url)
+        except Exception as e:
+            errs.append(e)
+            print(f"    [mysteel 页面失败] {url}：{e}")
+    if errs and not out:
+        raise errs[0]
+    return out
+
+
+def _mysteel_page_table(metrics, url):
+    """抓 Mysteel 频道首页价格表，按品名取（氧化铝/预焙阳极/A00铝锭各地区）。日期补全年份。"""
     headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                              "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-               "Referer": "https://lv.mysteel.com/",
+               "Referer": url,
                "Accept": "text/html,application/xhtml+xml"}
     html = None
     last_err = None
