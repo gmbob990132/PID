@@ -20,7 +20,7 @@
   python3 t_backtest.py                 # 调参组：调参段详表 + 检验段汇总
   python3 t_backtest.py --final         # 另外计算保留集（只在最后检验时用）
   python3 t_backtest.py --demo          # 合成数据离线自检
-第 5、6 部分（模拟收益、资金占用）见 t_pnl.py。
+第 5、6 部分（模拟收益、资金占用）见 t_pnl.py；第 7、8 部分（卖出规则组合、当天做完）见 t_exit.py。
 """
 import argparse
 import json
@@ -36,6 +36,7 @@ import pandas as pd
 
 import t_rules as R
 import t_pnl
+import t_exit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STOCKS_CSV = os.path.join(HERE, "tech_config", "stocks.csv")
@@ -362,6 +363,40 @@ def main():
     t_pnl.pnl_report(trades, pnl_frames, segs, p)
     t_pnl.capital_report(trades, pnl_frames, p, "重点")
     trades.to_csv(os.path.join(OUT_DIR, "trades.csv.gz"), index=False, encoding="utf-8-sig", compression="gzip")
+    del trades
+
+    # ---- 60 分钟线（A 股，新浪；换算成前复权）----
+    print("\n取 A 股 60 分钟线 …", flush=True)
+    mins_map, min_cov, mfail = {}, {}, []
+    for code, grp, d in pnl_frames:
+        if code.endswith(".HK"):
+            continue
+        try:
+            m = t_exit.demo_minutes(d) if a.demo else t_exit.fetch_min_sina(code)
+            m = m if a.demo else t_exit.to_qfq(m, d)
+            if m.empty:
+                raise RuntimeError("换算后为空")
+            mins_map[code] = m
+            min_cov[code] = (m["date"].min(), m["date"].max())
+        except Exception as e:  # noqa: BLE001
+            mfail.append(code)
+            print(f"  ✗ 分钟线 {code}: {str(e)[:100]}", flush=True)
+        if not a.demo:
+            time.sleep(0.3)
+    if min_cov:
+        a0 = min(v[0] for v in min_cov.values())
+        b0 = max(v[1] for v in min_cov.values())
+        p(f"\n分钟线：{len(mins_map)} 只 A 股，{a0:%Y-%m-%d} → {b0:%Y-%m-%d}" +
+          (f"；失败 {len(mfail)} 只：{', '.join(mfail)}" if mfail else ""))
+    print("卖出规则组合回测中 …", flush=True)
+    grid, years = t_exit.run_daily_grid(pnl_frames, R.RULESETS[VER], SPLIT, min_cov)
+    t_exit.exit_report(grid, years, p, a.final)
+    print("当天做完回测中 …", flush=True)
+    ig, iyears = t_exit.run_intraday(pnl_frames, mins_map, R.RULESETS[VER])
+    t_exit.intraday_report(ig, iyears, grid, years, p)
+    grid.to_csv(os.path.join(OUT_DIR, "exit_grid.csv"), index=False, encoding="utf-8-sig")
+    if ig is not None and not ig.empty:
+        ig.to_csv(os.path.join(OUT_DIR, "intraday_grid.csv"), index=False, encoding="utf-8-sig")
     if fails:
         lines.append(f"\n取数失败：{', '.join(fails)}")
         print(lines[-1])
