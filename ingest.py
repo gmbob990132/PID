@@ -169,11 +169,9 @@ def adapter_mysteel_flash(metrics):
         d = datetime.fromtimestamp(ms / 1000, tz=CN_TZ).date().isoformat() if ms \
             else datetime.now(CN_TZ).date().isoformat()
         parsed = _parse_flash(content, d)
-        if not parsed and not _SELFTEST and '短评' not in content[:40]:
-            _recent = (datetime.now(CN_TZ).date() - date.fromisoformat(d)).days <= 6
-            if '铝锭' in content or _recent:
-                _txt = re.sub(r'<[^>]+>', ' ', content)
-                print(f"    [mysteel 未解析] {d} keys={sorted(it.keys())} {_txt[:600]}")
+        # 快讯现在只用来取社会库存；带「库存总量」却没解析出来时才提示
+        if not parsed and not _SELFTEST and '库存总量' in content:
+            print(f"    [mysteel 库存未解析] {d} {re.sub(r'<[^>]+>', ' ', content)[:120]}")
         for metric_id, value, src_change in parsed:
             obs.append({"metric_id": metric_id, "obs_date": d, "value": value,
                         "src_change": src_change, "source": "mysteel_openapi"})
@@ -328,9 +326,10 @@ def adapter_manual_csv(metrics):
             mid = (row.get("metric_id") or "").strip()
             d = (row.get("date") or "").strip()
             v = (row.get("value") or "").strip()
+            c = (row.get("change") or "").strip()   # 可选第4列：涨跌
             if mid in wanted and d and v:
                 out.append({"metric_id": mid, "obs_date": d, "value": float(v),
-                            "src_change": None, "source": "manual"})
+                            "src_change": float(c) if c else None, "source": "manual"})
     return out
 
 
@@ -590,6 +589,20 @@ def run(db_path):
                 conn.execute("INSERT INTO ingest_runs(source,metric_id,run_at,status,rows_written,message) "
                              "VALUES(?,?,?,?,?,?)", (source_ref, m["id"], now_utc, st, len(got), msg))
                 all_by_metric[m["id"]] = got
+
+        # 手动补录：manual_prices.csv 对所有指标生效（补缺口用），手填值优先于抓取值
+        manual_ids = {m["id"] for m in METRICS if m.get("active", 1) and m["source_ref"] not in ("derived", "manual_csv")}
+        n_manual = 0
+        for o in adapter_manual_csv([{"id": i} for i in manual_ids]):
+            conn.execute(
+                "INSERT INTO observations(metric_id,obs_date,value,src_change,source,status,ingested_at) "
+                "VALUES(?,?,?,?,?,'ok',?) ON CONFLICT(metric_id,obs_date) DO UPDATE SET "
+                "value=excluded.value, src_change=COALESCE(excluded.src_change, observations.src_change), "
+                "source=excluded.source, ingested_at=excluded.ingested_at",
+                (o["metric_id"], o["obs_date"], o["value"], o["src_change"], o["source"], now_utc))
+            n_manual += 1
+        if n_manual:
+            print(f"    [手动补录] manual_prices.csv 写入 {n_manual} 条")
 
         # 衍生指标（自算，读库计算，如现货升贴水 = 现货 − 主力）
         for m in METRICS:
