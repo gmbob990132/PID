@@ -11,6 +11,10 @@ done
 # 删掉"技术指标分析"按钮
 sed -i '/const tc=document.createElement/,/bar.appendChild(tc);/d' dist/index.html
 if grep -q 'textContent="技术指标分析"' dist/index.html; then echo "错误：技术指标按钮没有删干净" >&2; exit 1; fi
+# 删掉"T助手"按钮（仅内部版）
+sed -i '/const tz=document.createElement/,/bar.appendChild(tz);/d' dist/index.html
+if grep -q 'textContent="T助手"' dist/index.html; then echo "错误：T助手按钮没有删干净" >&2; exit 1; fi
+if ls dist | grep -q '^t_api'; then echo "错误：dist 里混进了 t_api 目录" >&2; exit 1; fi
 if ls dist | grep -q '^tech'; then echo "错误：dist 里混进了 tech 目录" >&2; exit 1; fi
 touch dist/.nojekyll
 echo "公开版已生成：dist/（$(du -sh dist | cut -f1)）"

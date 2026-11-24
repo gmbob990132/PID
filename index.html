@@ -96,6 +96,50 @@
   .mc-sec{font-size:16px;font-weight:700;margin:24px 0 8px;padding-left:8px;border-left:4px solid var(--accent,#2a6fdb)}
   .mc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media (max-width:900px){.mc-grid{grid-template-columns:1fr}}
+  /* ===== T助手 ===== */
+  .tz-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin:6px 0 4px}
+  .tz-head .t{font-size:18px;font-weight:700}
+  .tz-head .upd{font-size:12px;color:var(--muted)}
+  .tz-disc{font-size:12px;color:var(--sec);background:#f3f2ee;border:1px solid var(--border);border-radius:10px;padding:6px 12px;margin:6px 0 8px}
+  .tz-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 10px}
+  .tz-msg{font-size:12.5px;margin:4px 2px}
+  .tz-msg.err{color:#a3302b} .tz-msg.ok{color:#2d6e2d}
+  .tz-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:860px){.tz-grid{grid-template-columns:1fr}}
+  .tz-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04);cursor:pointer}
+  .tz-card{min-width:0}
+  .tz-card.open{grid-column:1/-1;cursor:default;border-color:var(--border2)}
+  .tz-card.pinned{box-shadow:inset 3px 0 0 var(--navy),0 1px 3px rgba(0,0,0,.04)}
+  .tz-top{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+  .tz-top .nm{font-weight:700;font-size:15px} .tz-top .cd{font-size:12px;color:var(--muted)}
+  .tz-top .px{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums}
+  .tz-pin{border:none;background:none;font-size:18px;cursor:pointer;color:#c9c5ba;padding:0 2px;line-height:1}
+  .tz-pin.on{color:#e0a53b}
+  .tz-chip{display:inline-block;font-size:11.5px;border:1px solid var(--border2);border-radius:999px;padding:0 8px;color:var(--sec);white-space:nowrap}
+  .tz-chip.dark{background:var(--navy);border-color:var(--navy);color:#fff}
+  .tz-chip.mid{background:#e8ecf3;border-color:#cfd7e6;color:var(--navy)}
+  .tz-row{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:13px;margin-top:6px;color:var(--text)}
+  .tz-row .lb{color:var(--muted);font-size:12px;margin-right:4px}
+  .tz-row b{font-variant-numeric:tabular-nums}
+  .tz-strong{font-size:11px;color:var(--navy);font-weight:700;margin-left:2px}
+  .tz-d{font-size:12px;color:var(--muted)}
+  .tz-sec{font-size:14px;font-weight:700;margin:14px 0 6px;padding-left:8px;border-left:3px solid var(--navy)}
+  .tz-detail{margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+  .tz-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+  .tz-cols>div{min-width:0}
+  @media (max-width:860px){.tz-cols{grid-template-columns:1fr}}
+  .tz-tbl{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:auto}
+  .tz-tbl{min-width:0}
+  .tz-tbl td,.tz-tbl th{white-space:normal;overflow-wrap:anywhere}
+  .tz-tbl th,.tz-tbl td{padding:4px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+  .tz-tbl th{color:var(--muted);font-weight:500;font-size:12px}
+  .tz-tbl td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tz-tbl tr.cur td{background:#f3f2ee;font-weight:700}
+  .tz-tbl tr.pick td{background:#eef2f8}
+  .tz-tbl .note{color:var(--sec);font-size:11.5px}
+  .tz-ok{color:var(--navy);font-weight:700} .tz-no{color:#c9c5ba}
+  .tz-chart{height:360px;margin-top:4px}
+  .tz-close{float:right;border:1px solid var(--border2);background:var(--card);border-radius:999px;font-size:12px;padding:2px 10px;cursor:pointer;color:var(--sec)}
   /* ===== 技术指标分析 ===== */
   .wrap.wide{max-width:1180px}
   .tech-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:6px 0 4px}
@@ -264,7 +308,7 @@ async function boot(){
 function renderIndBar(){
   const bar = document.getElementById("indBar");
   bar.innerHTML = "";
-  // 顺序：指数估值 → 宏观数据 → ETF·两融 → 金属 → 电解铝 → 煤炭 → 农产品 → 技术指标分析（仅内部版）
+  // 顺序：指数估值 → 宏观数据 → ETF·两融 → 金属 → 电解铝 → 煤炭 → 农产品 → 技术指标分析、T助手（仅内部版）
   const e=document.createElement("button");
   e.className="ind-btn"+(curTop==="erp"?" on":"");
   e.textContent="指数估值"; e.onclick=()=>selectErp();
@@ -299,7 +343,11 @@ function renderIndBar(){
   tc.className="ind-btn"+(curTop==="tech"?" on":"");
   tc.textContent="技术指标分析"; tc.onclick=()=>selectTech();
   bar.appendChild(tc);
-  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf"||curTop==="macro");
+  const tz=document.createElement("button");    // T助手（仅内部版）
+  tz.className="ind-btn"+(curTop==="tz"?" on":"");
+  tz.textContent="T助手"; tz.onclick=()=>selectTz();
+  bar.appendChild(tz);
+  document.querySelector(".wrap").classList.toggle("wide", curTop==="tech"||curTop==="etf"||curTop==="macro"||curTop==="tz");
 }
 
 async function selectModule(id){
@@ -2191,6 +2239,224 @@ window.addEventListener("resize", ()=>{
   if(agriChart) agriChart.resize();
 });
 boot();
+// ================== T助手（重点股的关键价位、指标状态与历史统计；数据：t_api/，由 t-daily 每个交易日 21:00 更新）==================
+// 只提供客观的指标状态与历史统计，不构成任何建议。置顶保存在 tech_config/t_pins.csv（复用"股票池"的 GitHub 令牌）。
+const TZ_PIN_PATH="tech_config/t_pins.csv";
+let tzData=null, tzErr="", tzPins=new Set(), tzOpen=null, tzQ="", tzFilter="all", tzMsg=null, tzSub="list", tzChart=null, tzPinQueue=Promise.resolve();
+
+async function selectTz(){
+  curTop="tz"; chart=null; erpCharts=[]; metalsChart=null; agriChart=null;
+  renderIndBar(); renderTzSubBar();
+  document.getElementById("pane").innerHTML='<div class="empty">加载中…</div>';
+  tzErr="";
+  try{ tzData=await loadCached("t_api/overview.json"); }
+  catch(e){ tzData=null; tzErr="T助手的数据还没有生成。请到仓库 Actions 页面手动运行一次 t-daily。"; }
+  try{
+    const r=await fetch(TZ_PIN_PATH+"?t="+Date.now());
+    if(r.ok){ const rows=csvParse(await r.text()); rows.shift(); tzPins=new Set(rows.map(x=>(x[0]||"").trim().toUpperCase()).filter(Boolean)); }
+  }catch(e){}
+  renderTzPane();
+}
+function renderTzSubBar(){
+  const bar=document.getElementById("subBar"); bar.innerHTML="";
+  [["list","重点股"],["help","说明"]].forEach(([k,lb])=>{
+    const b=document.createElement("button"); b.className="sub-btn"+(k===tzSub?" on":""); b.textContent=lb;
+    b.onclick=()=>{ tzSub=k; renderTzSubBar(); renderTzPane(); }; bar.appendChild(b);
+  });
+}
+function tzDispose(){ if(tzChart){ try{ tzChart.dispose(); }catch(e){} tzChart=null; } }
+function tzP(v,dp){ return v==null?"—":Number(v).toFixed(dp==null?2:dp); }
+function tzPct(v,dp){ return v==null?"—":(v*100).toFixed(dp==null?1:dp)+"%"; }
+function tzDist(v){ return v==null?"":'<span class="tz-d">'+(v>0?"+":"")+v.toFixed(2)+'%</span>'; }
+function tzLvl(l){
+  if(!l) return "—";
+  return '<b>'+tzP(l.price,l.price<10?3:2)+'</b> '+tzDist(l.dist)+(l.strong?'<span class="tz-strong" title="'+esc(l.src.join("、"))+'">◆强</span>':'')+
+    ' <span class="tz-d">'+esc(l.src.slice(0,3).join("、"))+'</span>';
+}
+function tzTierChip(sd,s){
+  if(!s) return '<span class="tz-chip">'+sd+' —</span>';
+  const cls=s.tier==="强"?"tz-chip dark":(s.tier==="一般"?"tz-chip mid":"tz-chip");
+  return '<span class="'+cls+'" title="核心条件满足数 / 总数；达到 '+s.k+' 条为“强”档，'+Math.max(1,s.k-1)+' 条为“一般”档">'+sd+'侧 '+s.hits+'/'+s.n+(s.tier?' · '+s.tier+'档':'')+'</span>';
+}
+function tzRank(it){ const t=x=>x&&x.tier==="强"?2:(x&&x.tier==="一般"?1:0); return Math.max(t(it.sides["正T"]),t(it.sides["反T"])); }
+function tzList(){
+  let L=(tzData&&tzData.stocks||[]).slice();
+  const q=tzQ.trim().toLowerCase();
+  if(q) L=L.filter(x=>(x.code+" "+x.name).toLowerCase().includes(q));
+  if(tzFilter==="pin") L=L.filter(x=>tzPins.has(x.code));
+  if(tzFilter==="A") L=L.filter(x=>x.market==="A");
+  if(tzFilter==="HK") L=L.filter(x=>x.market==="HK");
+  if(tzFilter==="buy") L=L.filter(x=>x.sides["正T"]&&x.sides["正T"].tier==="强");
+  if(tzFilter==="sell") L=L.filter(x=>x.sides["反T"]&&x.sides["反T"].tier==="强");
+  L.sort((a,b)=>(tzPins.has(b.code)-tzPins.has(a.code))||(tzRank(b)-tzRank(a))||a.code.localeCompare(b.code));
+  return L;
+}
+function renderTzPane(){
+  const pane=document.getElementById("pane"); etfDispose(); tzDispose();
+  if(tzErr||!tzData){ pane.innerHTML='<div class="empty">'+esc(tzErr||"暂无数据")+'</div>'; return; }
+  if(tzSub==="help"){ pane.innerHTML=tzHelpHtml(); return; }
+  const S=tzData.stocks||[], dmax=S.map(x=>x.date).sort().pop()||"";
+  const gen=(tzData.generated_at||"").slice(0,16).replace("T"," ");
+  let h='<div class="tz-head"><span class="t">T助手</span><span class="tz-chip">重点股 '+S.length+' 只</span>'+
+    '<span class="upd">行情截至 '+esc(dmax)+' 收盘 · 计算于 '+esc(gen)+'（北京时间）</span></div>'+
+    '<div class="tz-disc">这里只列出客观的价位、指标状态和历史统计，不构成任何买卖建议。价位均按当天收盘计算，用于下一个交易日参考。</div>';
+  const chips=[["all","全部"],["pin","★ 置顶"],["A","A股"],["HK","港股"],["buy","正T侧达强档"],["sell","反T侧达强档"]];
+  h+='<div class="tz-tools"><input class="tech-q" id="tzQ" placeholder="搜索代码或名称" value="'+esc(tzQ)+'">'+
+    chips.map(([k,lb])=>'<button class="tech-chip'+(tzFilter===k?" on":"")+'" data-f="'+k+'">'+lb+'</button>').join("")+'</div>';
+  if(tzMsg) h+='<div class="tz-msg '+tzMsg.t+'">'+esc(tzMsg.m)+'</div>';
+  const L=tzList();
+  h+='<div class="tz-grid">'+(L.length?L.map(tzCard).join(""):'<div class="empty">没有符合条件的股票</div>')+'</div>';
+  if((tzData.fails||[]).length) h+='<div class="tech-warn" style="margin-top:10px">今天没有算出来：'+tzData.fails.map(x=>esc(x.code+" "+(x.name||"")+"（"+x.err+"）")).join("；")+'</div>';
+  pane.innerHTML=h;
+  const qi=document.getElementById("tzQ");
+  qi.oninput=()=>{ tzQ=qi.value; const pos=qi.selectionStart; renderTzPane(); const n=document.getElementById("tzQ"); n.focus(); n.setSelectionRange(pos,pos); };
+  pane.querySelectorAll(".tech-chip[data-f]").forEach(b=>b.onclick=()=>{ tzFilter=b.dataset.f; renderTzPane(); });
+  pane.querySelectorAll(".tz-pin").forEach(b=>b.onclick=ev=>{ ev.stopPropagation(); tzTogglePin(b.dataset.c); });
+  pane.querySelectorAll(".tz-card").forEach(c=>c.onclick=ev=>{
+    if(ev.target.closest(".tz-detail")&&!ev.target.closest(".tz-close")) return;
+    const code=c.dataset.c; tzOpen=(tzOpen===code)?null:code; renderTzPane();
+    if(tzOpen){ const el=document.querySelector('.tz-card[data-c="'+tzOpen+'"]'); if(el) el.scrollIntoView({behavior:"smooth",block:"start"}); }
+  });
+  if(tzOpen&&L.some(x=>x.code===tzOpen)) tzDrawChart(tzOpen);
+}
+function tzCard(it){
+  const open=tzOpen===it.code, pin=tzPins.has(it.code), i=it.ind||{};
+  const pct=it.pct==null?"":' <span class="'+chgClass(it.pct)+'" style="font-weight:600">'+(it.pct>0?"+":"")+it.pct.toFixed(2)+'%</span>';
+  let h='<div class="tz-card'+(open?" open":"")+(pin?" pinned":"")+'" data-c="'+esc(it.code)+'">'+
+    '<div class="tz-top"><button class="tz-pin'+(pin?" on":"")+'" data-c="'+esc(it.code)+'" title="'+(pin?"取消置顶":"置顶")+'">'+(pin?"★":"☆")+'</button>'+
+    '<span class="nm">'+esc(it.name||it.code)+'</span><span class="cd">'+esc(it.code)+'</span>'+
+    '<span class="tz-chip">'+esc(it.trend||"—")+'</span>'+(it.long?'<span class="tz-chip">'+esc(it.long)+'</span>':'')+
+    '<span class="px">'+tzP(it.close,it.close<10?3:2)+pct+'</span></div>'+
+    '<div class="tz-row"><span><span class="lb">第一档 支撑</span>'+tzLvl(it.sup1)+'</span><span><span class="lb">压力</span>'+tzLvl(it.res1)+'</span></div>'+
+    '<div class="tz-row"><span><span class="lb">第二档 支撑</span>'+tzLvl(it.sup2)+'</span><span><span class="lb">压力</span>'+tzLvl(it.res2)+'</span></div>'+
+    '<div class="tz-row"><span><span class="lb">预计波动</span><b>'+tzP(it.range_lo)+' – '+tzP(it.range_hi)+'</b> <span class="tz-d">ATR '+tzP(it.atr_pct)+'%</span></span>'+
+    '<span><span class="lb">RSI6</span><b>'+tzP(i.rsi6,1)+'</b></span><span><span class="lb">BIAS20</span><b>'+tzP(i.bias20,1)+'%</b>'+(i.bias20_pct!=null?' <span class="tz-d">分位'+i.bias20_pct.toFixed(0)+'%</span>':'')+'</span>'+
+    '<span><span class="lb">J</span><b>'+tzP(i.j,1)+'</b></span></div>'+
+    '<div class="tz-row" style="gap:6px">'+tzTierChip("正T",it.sides["正T"])+tzTierChip("反T",it.sides["反T"])+'</div>';
+  if(open) h+=tzDetail(it);
+  return h+'</div>';
+}
+function tzState(k,i){
+  const v=i[k];
+  if(k==="rsi6") return v==null?"":v<20?"超卖区（<20）":v<30?"偏低":v<=70?"中性":v<=80?"偏高":"超买区（>80）";
+  if(k==="rsi24") return v==null?"":v<30?"偏低（<30）":v<=70?"中性":"偏高（>70）";
+  if(k==="bias20"||k==="bias55"){ const p=i[k+"_pct"]; if(p==null) return "历史不足 250 天，无分位";
+    return "本股 10 年分位 "+p.toFixed(0)+"%"+(p<=5?"（历史低位）":p<=20?"（偏低）":p>=95?"（历史高位）":p>=80?"（偏高）":"（中间区域）"); }
+  if(k==="j") return v==null?"":v<0?"低于 0，处于近 9 日区间底部的极端位置":v>100?"高于 100，处于近 9 日区间顶部的极端位置":"区间内";
+  if(k==="macd"){ if(i.hist==null) return ""; const lg=i.hist_prev!=null?(Math.abs(i.hist)>Math.abs(i.hist_prev)?"变长":"缩短"):"";
+    return "DIF 在零轴"+(i.dif>0?"上方":"下方")+"；柱子为"+(i.hist>0?"正":"负")+(lg?"，较前一日"+lg:""); }
+  if(k==="boll"){ const b=i.pctb; return b==null?"":b<0?"在下轨之下":b<20?"靠近下轨":b>100?"在上轨之上":b>80?"靠近上轨":"通道中部"; }
+  if(k==="vr") return v==null?"":v>2?"明显放量":v>1.2?"放量":v<0.7?"缩量":"接近平均";
+  return "";
+}
+function tzDetail(it){
+  const i=it.ind||{}, N=(tzData.notes||{});
+  let h='<div class="tz-detail"><button class="tz-close">收起</button>';
+  h+='<div class="tz-sec">近 160 日 K 线与关键价位</div><div class="tz-chart" id="tzc"></div>';
+  // 价位梯子
+  const picks={}; ["sup1","res1","sup2","res2"].forEach(k=>{ if(it[k]) picks[it[k].price]=(picks[it[k].price]?picks[it[k].price]+"/":"")+({sup1:"第一档支撑",res1:"第一档压力",sup2:"第二档支撑",res2:"第二档压力"}[k]); });
+  const lad=(it.ladder||[]).slice(); let rowsH="", placed=false;
+  lad.forEach(x=>{
+    if(!placed&&x.price<it.close){ rowsH+='<tr class="cur"><td class="n">'+tzP(it.close,it.close<10?3:2)+'</td><td>当日收盘</td><td></td><td></td></tr>'; placed=true; }
+    rowsH+='<tr'+(picks[x.price]?' class="pick"':'')+'><td class="n">'+tzP(x.price,x.price<10?3:2)+'</td><td>'+esc(x.name)+(picks[x.price]?' <span class="tz-strong">'+picks[x.price]+'</span>':'')+'</td><td class="n">'+tzDist(x.dist)+'</td><td class="note">'+esc(x.tf)+'</td></tr>';
+  });
+  if(!placed) rowsH+='<tr class="cur"><td class="n">'+tzP(it.close)+'</td><td>当日收盘</td><td></td><td></td></tr>';
+  const mm=it.minute||{}, mtxt=["m60","m30"].map(p=>{ const m=mm[p]||{}; const lab=p==="m60"?"60 分钟":"30 分钟";
+    return lab+"：MA55 "+(m.ma55!=null?tzP(m.ma55):"积累中")+"，MA233 "+(m.ma233!=null?tzP(m.ma233):"积累中（"+(m.bars||0)+"/233 根）")+(m.src?"，来源 "+m.src:""); }).join("；");
+  h+='<div class="tz-cols"><div><div class="tz-sec">价位梯子（从高到低）</div><table class="tz-tbl"><tr><th>价位</th><th>来源</th><th>距收盘</th><th>周期</th></tr>'+rowsH+'</table>'+
+    '<div class="tech-note">第一档 = 离收盘最近（至少 0.3%）的候选价位；第二档 = 至少离收盘 0.5 个 ATR。1% 以内有多个价位重合的标“◆强”。<br>'+esc(mtxt)+'</div></div>';
+  // 指标状态
+  const IR=[["趋势",esc((it.trend||"—")+(it.long?" · "+it.long:"")),"",N.trend],
+    ["RSI6",tzP(i.rsi6,1),tzState("rsi6",i),N.rsi6],["RSI24",tzP(i.rsi24,1),tzState("rsi24",i),N.rsi24],
+    ["BIAS20",tzP(i.bias20,2)+"%",tzState("bias20",i),N.bias20],["BIAS55",tzP(i.bias55,2)+"%",tzState("bias55",i),N.bias55],
+    ["KDJ","K "+tzP(i.k,1)+" / D "+tzP(i.d,1)+" / J "+tzP(i.j,1),tzState("j",i),N.kdj],
+    ["MACD","DIF "+tzP(i.dif,3)+" / DEA "+tzP(i.dea,3)+" / 柱 "+tzP(i.hist,3),tzState("macd",i),N.macd],
+    ["布林线","上 "+tzP(i.boll_up)+" / 中 "+tzP(i.ma20)+" / 下 "+tzP(i.boll_low)+" · %B "+tzP(i.pctb,0)+"%",tzState("boll",i),N.boll],
+    ["量比",tzP(i.vr,2),tzState("vr",i),N.vr],["ATR",tzP(it.atr,3)+"（"+tzP(it.atr_pct)+"%）","",N.atr],
+    ["均线","MA5 "+tzP(i.ma5)+" · MA10 "+tzP(i.ma10)+" · MA20 "+tzP(i.ma20)+" · MA55 "+tzP(i.ma55)+" · MA233 "+tzP(i.ma233),"",""]];
+  h+='<div><div class="tz-sec">指标状态</div><table class="tz-tbl">'+IR.map(r=>'<tr><td style="white-space:nowrap">'+r[0]+'</td><td>'+r[1]+(r[2]?'<div class="note" style="color:var(--text)">'+esc(r[2])+'</div>':'')+(r[3]?'<div class="note">'+esc(r[3])+'</div>':'')+'</td></tr>').join("")+'</table></div></div>';
+  // 条件清单 + 历史统计
+  h+='<div class="tz-sec">条件清单与历史统计（'+esc(it.trend||"")+'趋势）</div><div class="tz-cols">';
+  ["正T","反T"].forEach(sd=>{
+    const s=it.sides[sd], st=(it.stats||{})[sd];
+    h+='<div>';
+    if(!s){ h+='<div class="tech-note">'+sd+'：趋势未定（历史不足），没有条件可算。</div></div>'; return; }
+    h+='<div style="margin-bottom:4px">'+tzTierChip(sd,s)+' <span class="tz-d">'+(sd==="正T"?"先买后卖：看下方支撑":"先卖后买：看上方压力")+'</span></div>'+
+      '<table class="tz-tbl">'+s.conds.map(c=>'<tr><td style="width:18px" class="'+(c.ok?"tz-ok":"tz-no")+'">'+(c.ok?"✓":"·")+'</td><td>'+esc(c.desc)+'</td></tr>').join("")+'</table>';
+    if(st){
+      const lab="过去 10 年，同为「"+it.trend+"趋势 · "+sd+"侧条件 ≥"+st.hits+" 条」的交易日"+(st.hits===0?"（即该趋势下的全部交易日）":"");
+      const col=(o,k,fmt)=>o&&o.n?fmt(o[k]):"—";
+      const R=[["样本天数",o=>o&&o.n?o.n.toLocaleString():"—"],
+        ["次日触及第一档"+(sd==="正T"?"支撑":"压力"),o=>col(o,"fill",tzPct)],["次日触及第二档",o=>col(o,"fill2",tzPct)],
+        ["触及后：当日收盘仍有 0.5% 以上价差",o=>col(o,"cons",tzPct)],["触及后：1 日内出现 1.5% 价差",o=>col(o,"d1",tzPct)],
+        ["触及后：2 日内出现 1.5% 价差",o=>col(o,"d2",tzPct)],["触及后：3 日内出现 1.5% 价差",o=>col(o,"d3",tzPct)],
+        ["触及后 3 日内平均最大"+(sd==="正T"?"跌幅":"涨幅"),o=>col(o,"dd3",v=>v==null?"—":((v>0?"+":"")+(v*100).toFixed(1)+"%"))]];
+      h+='<div class="tech-note" style="margin-top:8px">'+esc(lab)+'</div><table class="tz-tbl"><tr><th></th><th class="n" style="text-align:right">本股</th><th class="n" style="text-align:right">全部重点股</th></tr>'+
+        R.map(r=>'<tr><td>'+r[0]+'</td><td class="n">'+r[1](st.own)+'</td><td class="n">'+r[1](st.pool)+'</td></tr>').join("")+'</table>';
+    }
+    h+='</div>';
+  });
+  h+='</div><div class="tech-note">历史统计只描述过去发生的频率；“价差”按触及价计算，1/2/3 日内不含触及当天。本股样本少于 30 天时参考意义有限。</div></div>';
+  return h;
+}
+async function tzDrawChart(code){
+  let k; try{ k=await loadCached("t_api/kline/"+code+".json"); }catch(e){ return; }
+  const el=document.getElementById("tzc"); if(!el||tzOpen!==code) return;
+  tzDispose(); tzChart=echarts.init(el);
+  const it=(tzData.stocks||[]).find(x=>x.code===code)||{};
+  const seen={};
+  const lines=[["sup1","一档支撑","#3a6fb0","dashed","insideStartBottom"],["res1","一档压力","#b0553a","dashed","insideEndTop"],["sup2","二档支撑","#3a6fb0","dotted","insideStartBottom"],["res2","二档压力","#b0553a","dotted","insideEndTop"]]
+    .filter(([key])=>{ if(!it[key]) return false; const pv=it[key].price; if(seen[pv]) return false; seen[pv]=1; return true; }).map(([key,nm,c,t,pos])=>({yAxis:it[key].price,name:nm,lineStyle:{color:c,type:t,width:1.2},label:{formatter:nm+" "+it[key].price,color:c,fontSize:11,position:pos}}));
+  const L=(nm,data,c,w,t)=>({name:nm,type:"line",data,showSymbol:false,lineStyle:{width:w||1.2,color:c,type:t||"solid"},itemStyle:{color:c},connectNulls:true});
+  tzChart.setOption({
+    animation:false, legend:{top:0,textStyle:{fontSize:11},data:["MA20","MA55","MA233","布林上轨","布林下轨"]},
+    grid:[{left:52,right:16,top:28,height:"64%"},{left:52,right:16,top:"80%",height:"14%"}],
+    tooltip:{trigger:"axis",axisPointer:{type:"cross"}},
+    xAxis:[{type:"category",data:k.dates,axisLabel:{color:"#888",formatter:v=>v.slice(5)},boundaryGap:true},{type:"category",gridIndex:1,data:k.dates,axisLabel:{show:false}}],
+    yAxis:[{scale:true,axisLabel:{color:"#888"},splitLine:{lineStyle:{color:"#f0eee8"}}},{gridIndex:1,scale:true,axisLabel:{show:false},splitLine:{show:false}}],
+    dataZoom:[{type:"inside",xAxisIndex:[0,1],start:40,end:100}],
+    series:[{name:"K线",type:"candlestick",data:k.ohlc,itemStyle:{color:"#d43f3a",color0:"#3a9d3a",borderColor:"#d43f3a",borderColor0:"#3a9d3a"},markLine:{symbol:"none",data:lines}},
+      L("MA20",k.ma20,"#e0a53b"),L("MA55",k.ma55,"#7a5fb0"),L("MA233",k.ma233,"#333",1.4),
+      L("布林上轨",k.boll_up,"#9aa7bd",1,"dashed"),L("布林下轨",k.boll_low,"#9aa7bd",1,"dashed"),
+      {name:"成交量",type:"bar",xAxisIndex:1,yAxisIndex:1,data:k.vol.map((v,j)=>({value:v,itemStyle:{color:(k.ohlc[j][1]>=k.ohlc[j][0])?"#e9a19e":"#9fd09f"}}))}]
+  });
+}
+function tzSavePins(){
+  return tzPinQueue=tzPinQueue.then(async ()=>{
+    for(let attempt=0;attempt<3;attempt++){
+      const g=await ghFetch("/repos/"+GH_OWNER+"/"+GH_REPO+"/contents/"+TZ_PIN_PATH);
+      let sha=null; if(g.ok){ sha=(await g.json()).sha; } else if(g.status!==404) throw new Error(ghErr(g.status));
+      const names=Object.fromEntries((tzData.stocks||[]).map(x=>[x.code,x.name||""]));
+      const body="﻿code,name\n"+[...tzPins].sort().map(c=>[c,names[c]||""].map(csvField).join(",")).join("\n")+"\n";
+      const put=await ghFetch("/repos/"+GH_OWNER+"/"+GH_REPO+"/contents/"+TZ_PIN_PATH,{method:"PUT",
+        body:JSON.stringify(Object.assign({message:"T助手 置顶 ("+tzPins.size+" 只, via web)",content:b64enc(body)},sha?{sha}:{}))});
+      if(put.status===409||put.status===422) continue;
+      if(!put.ok) throw new Error(ghErr(put.status));
+      return;
+    }
+    throw new Error("文件在提交过程中被反复修改，请稍后重试。");
+  });
+}
+async function tzTogglePin(code){
+  if(!ghToken()){ tzMsg={t:"err",m:"置顶需要 GitHub 令牌：请先到「技术指标分析 → 股票池」里设置令牌（只需一次），再回来点星标。"}; renderTzPane(); return; }
+  const had=tzPins.has(code); if(had) tzPins.delete(code); else tzPins.add(code);
+  tzMsg={t:"ok",m:"正在保存置顶…"}; renderTzPane();
+  try{ await tzSavePins(); tzMsg={t:"ok",m:"置顶已保存（换设备打开也会同步，GitHub 页面更新约需 1 分钟）。"}; }
+  catch(e){ if(had) tzPins.add(code); else tzPins.delete(code); tzMsg={t:"err",m:"置顶保存失败："+e.message}; }
+  if(curTop==="tz") renderTzPane();
+}
+function tzHelpHtml(){
+  const N=(tzData&&tzData.notes)||{};
+  const P='<p style="font-size:13.5px;line-height:1.75;margin:6px 0">';
+  return '<div class="tz-head"><span class="t">T助手 · 说明</span></div><div class="tz-disc">本页只提供客观的价位、指标状态和历史统计，不构成任何买卖建议。</div>'+
+    '<div class="tz-sec">数据与更新</div>'+P+'每个交易日北京时间 21:00 前后自动计算，只计算股票池里标记为“重点”的股票。A 股日线来自 Tushare，港股日线来自腾讯，均为前复权；新加入的重点股会自动取全部历史。分钟线：A 股来自新浪；港股来自东方财富，每次只能拿到约一个月，系统每天积累，60 分钟 MA233 约需 40 个交易日才能算出。</p>'+
+    '<div class="tz-sec">趋势</div>'+P+esc(N.trend||"")+'</p>'+
+    '<div class="tz-sec">支撑与压力</div>'+P+'候选价位：MA5/10/20/55/233、布林上下轨、当日高低点、20 日高低点、枢轴点 P/S1/R1、近 60 日成交密集区，以及 60/30 分钟线的 MA55、MA233。第一档取收盘价下方/上方最近的候选价位（至少相差 0.3%）；第二档要求至少相差 0.5 个 ATR。1% 以内有多个候选价位重合，标“◆强”。</p>'+
+    '<div class="tz-sec">条件与档位</div>'+P+'每种趋势下，正T 侧（先买后卖）和反T 侧（先卖后买）各有一组核心条件，来自 2016–2022 年 129 只股票的回测筛选，并在 2023 年以后的数据上检验过。满足条数达到约六成为“强”档，少一条为“一般”档。档位只表示条件满足的多少；回测显示，按固定 1.5% 止盈、到期收盘结算的方式机械操作，即使是“强”档，扣费后平均也没有正收益。</p>'+
+    '<div class="tz-sec">历史统计</div>'+P+'统计过去 10 年里，与今天“同一趋势、同一侧条件满足数不少于今天”的交易日：次日价格触及第一/二档价位的比例，以及触及后当日收盘、1/2/3 日内出现 1.5% 价差的比例，和 3 日内往不利方向的平均最大幅度。“本股”只用这只股票自己的历史，“全部重点股”把所有重点股合在一起，样本更多。</p>'+
+    '<div class="tz-sec">指标含义</div>'+["rsi6","rsi24","bias20","bias55","kdj","macd","boll","vr","atr"].map(k=>P+esc(N[k]||"")+'</p>').join("")+
+    '<div class="tz-sec">置顶</div>'+P+'点卡片左上角的星标即可置顶/取消，保存在仓库的 tech_config/t_pins.csv，换设备也同步。需要先在「技术指标分析 → 股票池」设置一次 GitHub 令牌。</p>';
+}
 </script>
 </body>
 </html>
