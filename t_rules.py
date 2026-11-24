@@ -259,15 +259,77 @@ RULES_V2 = {
     ],
     ("震荡", "反T"): RULES_V1[("震荡", "反T")],
 }
-RULES = RULES_V2          # 每日计算默认用第二版
-RULESETS = {1: RULES_V1, 2: RULES_V2}
+# ---- 第三版：每条带"核心/候选"标记。命中数只数核心条件；候选条件照样计算、照样报告增益，
+# ---- 等更多数据验证后再决定去留。"位置"按第一档（最近）支撑压力计算。
+def _c(code, desc, fn, core=True):
+    return (code, desc, fn, core)
+
+
+V2 = {k: {c[0]: c for c in v} for k, v in RULES_V2.items()}
+V1 = {k: {c[0]: c for c in v} for k, v in RULES_V1.items()}
+
+
+def _from(src, cell, code, core=True, new_code=None):
+    c = src[cell][code]
+    return (new_code or c[0], c[1], c[2], core)
+
+
+RULES_V3 = {
+    ("下跌", "正T"): [
+        _from(V2, ("下跌", "正T"), "rsi24"), _from(V2, ("下跌", "正T"), "rsi6"),
+        _from(V2, ("下跌", "正T"), "bias"), _from(V2, ("下跌", "正T"), "pos"),
+        _from(V2, ("下跌", "正T"), "kdj"),
+        _from(V2, ("下跌", "正T"), "macd", core=False),
+        _from(V1, ("下跌", "正T"), "vol", core=False),
+    ],
+    ("下跌", "反T"): [
+        _from(V2, ("下跌", "反T"), "rsi"), _from(V2, ("下跌", "反T"), "bias"),
+        _from(V2, ("下跌", "反T"), "biasq"), _from(V2, ("下跌", "反T"), "kdj", new_code="j90"),
+        _from(V2, ("下跌", "反T"), "pos", core=False),
+        _from(V1, ("下跌", "反T"), "macd", core=False),
+        _from(V1, ("下跌", "反T"), "vol", core=False),
+        _from(V1, ("下跌", "反T"), "kdj", core=False),
+    ],
+    ("上涨", "正T"): [
+        _from(V2, ("上涨", "正T"), "macd"), _from(V2, ("上涨", "正T"), "rsi"),
+        _from(V2, ("上涨", "正T"), "biasq"),
+        _from(V2, ("上涨", "正T"), "kdj", core=False),
+        _from(V2, ("上涨", "正T"), "pos", core=False, new_code="pos3"),
+        _from(V1, ("上涨", "正T"), "pos", core=False),
+        _from(V1, ("上涨", "正T"), "bias", core=False),
+        _from(V1, ("上涨", "正T"), "vol", core=False),
+    ],
+    ("上涨", "反T"): [
+        _from(V1, ("上涨", "反T"), "bias"), _from(V1, ("上涨", "反T"), "rsi"),
+        _from(V1, ("上涨", "反T"), "boll"), _from(V1, ("上涨", "反T"), "kdj"),
+        _from(V1, ("上涨", "反T"), "vol", core=False),
+    ],
+    ("震荡", "正T"): [
+        _from(V2, ("震荡", "正T"), "rsi"), _from(V2, ("震荡", "正T"), "kdj"),
+        _from(V2, ("震荡", "正T"), "biasq"),
+        _from(V1, ("震荡", "正T"), "range", core=False),
+        _c("pos", "靠近支撑（位置<1/3）", lambda d: d["pos"] < P["pos_low"], core=False),
+    ],
+    ("震荡", "反T"): [
+        _from(V1, ("震荡", "反T"), "rsi"), _from(V1, ("震荡", "反T"), "kdj"),
+        _from(V1, ("震荡", "反T"), "range"),
+        _c("pos", "靠近压力（位置>2/3）", lambda d: d["pos"] > P["pos_high"], core=False),
+    ],
+}
+RULES = RULES_V3          # 每日计算默认用第三版
+RULESETS = {1: RULES_V1, 2: RULES_V2, 3: RULES_V3}
+
+
+def is_core(cond):
+    return cond[3] if len(cond) > 3 else True
 
 
 def add_rules(d, rules=None):
     """每格条件算成布尔列 c_<趋势>_<方向>_<代码>；按当天趋势取对应格，得到 buy_hits/buy_n、sell_hits/sell_n"""
     rules = rules or RULES
     for (tr, side), conds in rules.items():
-        for code, _, fn in conds:
+        for cond in conds:
+            code, fn = cond[0], cond[2]
             d[f"c_{tr}_{side}_{code}"] = fn(d).fillna(False).astype(bool)
     d["buy_hits"] = 0
     d["sell_hits"] = 0
@@ -276,7 +338,7 @@ def add_rules(d, rules=None):
     for tr in ("上涨", "下跌", "震荡"):
         m = d["trend"] == tr
         for side, col in (("正T", "buy"), ("反T", "sell")):
-            cols = [f"c_{tr}_{side}_{c}" for c, _, _ in rules[(tr, side)]]
+            cols = [f"c_{tr}_{side}_{c[0]}" for c in rules[(tr, side)] if is_core(c)]
             d.loc[m, f"{col}_hits"] = d.loc[m, cols].sum(axis=1)
             d.loc[m, f"{col}_n"] = len(cols)
     d["buy_ratio"] = d["buy_hits"] / d["buy_n"].replace(0, np.nan)
@@ -288,6 +350,13 @@ def compute(df, version=2, ind=None):
     """version: 1 = 第一版规则 + 最近价位；2 = 第二版规则 + 至少 0.5 ATR 的价位。
     ind: 已算好的指标表（回测时两版共用，省时间）"""
     d = (ind if ind is not None else add_trend(add_indicators(df))).copy()
-    d = add_levels(d, version=version)
+    if version >= 3:
+        # 第一档：最近价位（位置也按它算）；第二档：至少 0.5 个 ATR
+        d = add_levels(d, version=1)
+        two = d.apply(lambda row: pd.Series(levels_row(row, version=2),
+                                            index=["sup2", "sup2_src", "res2", "res2_src"]), axis=1)
+        d = pd.concat([d, two], axis=1)
+    else:
+        d = add_levels(d, version=version)
     d = add_rules(d, RULESETS[version])
     return d
