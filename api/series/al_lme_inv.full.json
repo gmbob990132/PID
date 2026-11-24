@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-23T09:22:52+00:00",
+  "generated_at": "2026-11-24T04:17:34+00:00",
   "metric": {
     "id": "al_lme_inv",
     "name": "LME库存",
@@ -16855,6 +16855,12 @@
       "date": "2026-11-20",
       "value": 22.35,
       "change": -0.08999999999999986,
+      "src_change": null
+    },
+    {
+      "date": "2026-11-23",
+      "value": 22.14,
+      "change": -0.21000000000000085,
       "src_change": null
     }
   ]
