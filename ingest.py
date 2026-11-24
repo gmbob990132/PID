@@ -137,16 +137,17 @@ def adapter_mysteel_flash(metrics):
     else:
         raw = None
         last_err = None
-        for _attempt in range(3):
+        import time as _t
+        for _attempt in range(5):
             try:
                 req = Request(_MY_URL, headers=_MY_HEADERS)
-                with urlopen(req, timeout=15) as resp:
+                with urlopen(req, timeout=40) as resp:
                     raw = json.loads(resp.read().decode('utf-8'))
                 break
             except Exception as e:
                 last_err = e
-                import time as _t
-                _t.sleep(3)
+                print(f"    [mysteel] 第{_attempt+1}次失败：{e}")
+                _t.sleep(10 * (_attempt + 1))
         if raw is None:
             raise last_err
     items = _find_items(raw)
