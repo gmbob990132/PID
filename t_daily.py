@@ -82,11 +82,16 @@ def load_focus():
 
 
 # ---------------- 分钟线 ----------------
+EM_FAILS = 0          # 东财港股分钟线连续失败次数（GitHub 服务器上经常被直接断开）
 def fetch_hk_min_em(code, klt):
     num = code.split(".")[0].zfill(5)
+    global EM_FAILS
+    if EM_FAILS >= 3:                    # 本次运行里东财已经连续失败 3 次：后面直接用腾讯备用，不再白等
+        raise RuntimeError("东财本次运行已连续失败，跳过")
     last = None
-    for attempt in range(4):
-        host = ["push2his.eastmoney.com", "33.push2his.eastmoney.com"][attempt % 2]
+    time.sleep(1.0)
+    for attempt in range(2):
+        host = ["push2his.eastmoney.com", "33.push2his.eastmoney.com"][attempt]
         url = (f"https://{host}/api/qt/stock/kline/get?secid=116.{num}&fields1=f1"
                f"&fields2=f51,f52,f53,f54,f55&klt={klt}&fqt=0&end=20500101&lmt=300")
         try:
@@ -101,11 +106,57 @@ def fetch_hk_min_em(code, klt):
                 a = s.split(",")
                 rows.append({"dt": a[0], "open": float(a[1]), "close": float(a[2]),
                              "high": float(a[3]), "low": float(a[4])})
+            EM_FAILS = 0
             return pd.DataFrame(rows)
         except Exception as e:  # noqa: BLE001
             last = e
-            time.sleep(2 * (attempt + 1))
+            time.sleep(2)
+    EM_FAILS += 1
     raise RuntimeError(f"东财港股{klt}分钟线失败：{type(last).__name__}: {str(last)[:80]}")
+
+
+# 港股分钟线备用：腾讯当日分时（只有当天，每分钟一个价）→ 自己合成 30/60 分钟线，只补当天
+HK_BARS = {
+    60: [(930, 1030), (1031, 1130), (1131, 1330), (1331, 1430), (1431, 1530), (1531, 1600)],
+    30: [(930, 1000), (1001, 1030), (1031, 1100), (1101, 1130), (1131, 1200), (1201, 1330),
+         (1331, 1400), (1401, 1430), (1431, 1500), (1501, 1530), (1531, 1600)],
+}
+
+
+def fetch_hk_today_qq(code):
+    num = code.split(".")[0].zfill(5)
+    last = None
+    for attempt in range(4):
+        host = ["web.ifzq.gtimg.cn", "ifzq.gtimg.cn"][attempt % 2]
+        try:
+            with urlopen(Request(f"https://{host}/appstock/app/hkMinute/query?code=hk{num}",
+                                 headers={"User-Agent": UA, "Referer": "https://gu.qq.com/"}), timeout=20) as r:
+                js = json.loads(r.read().decode("utf-8", "replace"))
+            node = (((js.get("data") or {}).get(f"hk{num}") or {}).get("data") or {})
+            rows = []
+            for line in node.get("data") or []:
+                a = line.split()
+                if len(a) >= 2:
+                    rows.append((int(a[0]), float(a[1])))
+            if not rows:
+                raise RuntimeError("当日分时为空")
+            return rows, str(node.get("date") or "")
+        except Exception as e:  # noqa: BLE001
+            last = e
+            time.sleep(3 * (attempt + 1))
+    raise RuntimeError(f"腾讯港股当日分时失败：{type(last).__name__}: {str(last)[:80]}")
+
+
+def hk_today_bars(rows, day, period):
+    """rows: [(HHMM, 价格)] → [(dt, open, high, low, close)]；收盘前数据不全时返回空"""
+    if not rows or rows[-1][0] < 1600:
+        return []
+    out = []
+    for a, b in HK_BARS[period]:
+        px = [p for t, p in rows if a <= t <= b]
+        if px:
+            out.append((f"{day} {b // 100:02d}:{b % 100:02d}", px[0], max(px), min(px), px[-1]))
+    return out
 
 
 def min_db():
@@ -119,6 +170,7 @@ def min_db():
 def minute_mas(code, daily, con):
     """返回 {'m60': {...}, 'm30': {...}}：每个周期的 MA55、MA233（前复权）、根数、来源、状态"""
     out = {}
+    today_cache = {}                     # 腾讯当日分时，60/30 两个周期共用一次请求
     for p in (60, 30):
         info = {"ma55": None, "ma233": None, "bars": 0, "src": "", "err": ""}
         try:
@@ -126,11 +178,34 @@ def minute_mas(code, daily, con):
                 info["src"] = "东方财富（逐日积累）"
                 try:
                     new = fetch_hk_min_em(code, p)
+                    for day in sorted({x[:10] for x in new["dt"]}):      # 东财的数据为准：同一天先删后写
+                        con.execute("DELETE FROM bars WHERE code=? AND period=? AND substr(dt,1,10)=?", (code, p, day))
                     con.executemany("INSERT OR REPLACE INTO bars VALUES(?,?,?,?,?,?,?)",
                                     [(code, p, r.dt, r.open, r.high, r.low, r.close) for r in new.itertuples()])
                     con.commit()
                 except Exception as e:  # noqa: BLE001
                     info["err"] = str(e)[:80]
+                    day = daily["date"].iloc[-1].strftime("%Y-%m-%d")          # 最近一个交易日
+                    have = con.execute("SELECT COUNT(*) FROM bars WHERE code=? AND period=? AND substr(dt,1,10)=?",
+                                       (code, p, day)).fetchone()[0]
+                    if have == 0:
+                        try:
+                            if "qq" not in today_cache:
+                                today_cache["qq"] = fetch_hk_today_qq(code)
+                            rows, qday = today_cache["qq"]
+                            if qday and qday.replace("-", "")[:8] != day.replace("-", ""):
+                                raise RuntimeError(f"腾讯分时日期 {qday} 与最近交易日 {day} 不一致")
+                            bars = hk_today_bars(rows, day, p)
+                            if bars:
+                                con.executemany("INSERT OR REPLACE INTO bars VALUES(?,?,?,?,?,?,?)",
+                                                [(code, p) + b for b in bars])
+                                con.commit()
+                                info["src"] = "东方财富（逐日积累）+ 今天用腾讯分时补"
+                                info["err"] = ""
+                        except Exception as e2:  # noqa: BLE001
+                            info["err"] = (info["err"] + "；备用也失败：" + str(e2)[:60])[:150]
+                    else:
+                        info["err"] = ""          # 今天的数据已经有了（之前存过），不算失败
                 m = pd.read_sql_query("SELECT dt,open,high,low,close FROM bars WHERE code=? AND period=? ORDER BY dt",
                                       con, params=(code, p))
                 m["dt"] = pd.to_datetime(m["dt"])
