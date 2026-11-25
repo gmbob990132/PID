@@ -247,6 +247,52 @@ def hist_stats(d, trend, side, hits):
     return res
 
 
+# ---------------- 参考价位（只进价位梯子，不参与第一/二档的选择） ----------------
+def find_gaps(d, lookback=233, min_size=0.003):
+    """近 lookback 个交易日里至今没有完全回补的跳空缺口。
+    向上跳空：当天最低 > 前一天最高；之后某天最低价回到前一天最高以下即为补完。部分回补时只保留没补到的那段。
+    向下跳空：当天最高 < 前一天最低；之后最高价回到前一天最低以上即为补完。"""
+    t = d.tail(lookback + 1).reset_index(drop=True)
+    H, L, D = t["high"].to_numpy(), t["low"].to_numpy(), t["date"]
+    out = []
+    n = len(t)
+    for i in range(1, n):
+        if L[i] > H[i - 1] * (1 + min_size):                 # 向上跳空，缺口区间 [前高, 当天低]
+            lo, hi = H[i - 1], L[i]
+            if i + 1 < n:
+                m = L[i + 1:].min()
+                if m <= lo:
+                    continue
+                hi = min(hi, m)
+            out.append({"lo": lo, "hi": hi, "date": D[i], "up": True})
+        elif H[i] < L[i - 1] * (1 - min_size):               # 向下跳空，缺口区间 [当天高, 前低]
+            lo, hi = H[i], L[i - 1]
+            if i + 1 < n:
+                m = H[i + 1:].max()
+                if m >= hi:
+                    continue
+                lo = max(lo, m)
+            out.append({"lo": lo, "hi": hi, "date": D[i], "up": False})
+    return [g for g in out if g["hi"] / g["lo"] - 1 >= min_size]
+
+
+def ref_levels(d, c):
+    """55/233 日最高最低 + 未补缺口（当前价下方取上沿、上方取下沿；上下各取最近 2 个）"""
+    ref = []
+    for n in (55, 233):
+        if len(d) >= n:
+            ref.append((f"{n}日最低", float(d["low"].tail(n).min())))
+            ref.append((f"{n}日最高", float(d["high"].tail(n).max())))
+    gaps = find_gaps(d)
+    below = sorted([g for g in gaps if g["hi"] < c], key=lambda g: -g["hi"])[:2]
+    above = sorted([g for g in gaps if g["lo"] > c], key=lambda g: g["lo"])[:2]
+    for g in below + above:
+        edge = g["hi"] if g["hi"] < c else g["lo"]
+        ref.append((f"未补缺口 {g['lo']:.2f}–{g['hi']:.2f}（{g['date']:%Y-%m-%d} {'向上' if g['up'] else '向下'}跳空）",
+                    float(edge)))
+    return ref
+
+
 # ---------------- 单只股票 ----------------
 def analyze(code, name, raw, con):
     d = R.compute(raw, version=VER)
@@ -279,7 +325,17 @@ def analyze(code, name, raw, con):
             ladder.append({"name": lab, "price": f(v, 3), "dist": f((v / c - 1) * 100, 2), "tf": "日线"})
     for k, v in extra.items():
         ladder.append({"name": k, "price": f(v, 3), "dist": f((v / c - 1) * 100, 2), "tf": k[:4]})
-    ladder.sort(key=lambda x: -x["price"])
+    for k, v in ref_levels(d, c):
+        ladder.append({"name": k, "price": f(v, 3), "dist": f((v / c - 1) * 100, 2), "tf": "日线", "ref": True})
+    merged = {}                                   # 同一价位的多个来源合并成一行
+    for x in ladder:
+        key = (x["price"], x["tf"])
+        if key in merged:
+            merged[key]["name"] += " / " + x["name"]
+            merged[key]["ref"] = merged[key].get("ref", False) and x.get("ref", False)
+        else:
+            merged[key] = dict(x)
+    ladder = sorted(merged.values(), key=lambda x: -x["price"])
 
     def pctile(col):
         h = d[col].dropna()
