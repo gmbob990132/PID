@@ -115,7 +115,7 @@ def index_card(pts):
 
 def export(db=DB, out=OUT, today=None):
     c = sqlite3.connect(db)
-    S = {m: load(c, m) for m in ("ndx", "sox", "spx", "vix", "pe_m", "cape_m", "us10y", *[v[0] for v in QVIX.values()])}
+    S = {m: load(c, m) for m in ("ndx", "sox", "spx", "vix", "vix_high", "vix_low", "pe_m", "cape_m", "us10y", *[v[0] for v in QVIX.values()])}
     c.close()
     os.makedirs(os.path.join(out, "series"), exist_ok=True)
     os.makedirs(os.path.join(out, "qvix"), exist_ok=True)
@@ -161,11 +161,19 @@ def export(db=DB, out=OUT, today=None):
                              "q_all": qset(cv, 2), "since": S["cape_m"][0][0][:4]}
     # VIX
     if S["vix"]:
-        dump("series/vix.json", series_json(S["vix"], 2))
+        hi_m, lo_m = dict(S["vix_high"]), dict(S["vix_low"])
+        vj = series_json(S["vix"], 2)
+        if hi_m and lo_m:                      # 日内最高 / 最低，与收盘按日期对齐（缺的为 null）
+            vj["high"] = [round(hi_m[d], 2) if d in hi_m else None for d in vj["dates"]]
+            vj["low"] = [round(lo_m[d], 2) if d in lo_m else None for d in vj["dates"]]
+        dump("series/vix.json", vj)
         vv = [v for _, v in S["vix"]]
         cur = vv[-1]
         prev = vv[-2] if len(vv) > 1 else None
-        ov["val"]["vix"] = {"date": S["vix"][-1][0], "value": round(cur, 2), "chg": round(cur - prev, 2) if prev else None,
+        d_last = S["vix"][-1][0]
+        ov["val"]["vix"] = {"date": d_last, "value": round(cur, 2), "chg": round(cur - prev, 2) if prev else None,
+                            "high": round(hi_m[d_last], 2) if d_last in hi_m else None,
+                            "low": round(lo_m[d_last], 2) if d_last in lo_m else None,
                             "pct_5y": pos(window(S["vix"], 5, today), cur), "pct_10y": pos(window(S["vix"], 10, today), cur),
                             "q10y": qset(window(S["vix"], 10, today), 2), "since": S["vix"][0][0][:4]}
     # 半导体相对强弱 SOX ÷ NDX（按 NDX 日期对齐）
@@ -207,7 +215,8 @@ def selftest():
         for i in range(0, 4000):
             d = (d0 + timedelta(days=i)).isoformat()
             rows += [("spx", d, 2000 + i), ("ndx", d, 4000 + i), ("sox", d, 600 + i * 0.5), 
-                     ("vix", d, 10 + (i % 30)), ("us10y", d, 2.0), ("qvix_csi300", d, 15 + (i % 10))]
+                     ("vix", d, 10 + (i % 30)), ("vix_high", d, 12 + (i % 30)), ("vix_low", d, 9 + (i % 30)),
+                     ("us10y", d, 2.0), ("qvix_csi300", d, 15 + (i % 10))]
         for y in range(2015, 2026):
             for m in range(1, 13):
                 rows += [("pe_m", f"{y}-{m:02d}-01", 20.0), ("cape_m", f"{y}-{m:02d}-01", 25 + (y - 2015))]
@@ -229,6 +238,9 @@ def selftest():
         q = json.load(open(os.path.join(td, "us_api", "qvix", "csi300.json")))
         assert q["latest"]["date"] == last and q["q5y"] and len(q["dates"]) == 4000
         assert not os.path.exists(os.path.join(td, "us_api", "qvix", "cyb.json"))   # 没数据不生成
+        v = json.load(open(os.path.join(td, "us_api", "series", "vix.json")))
+        assert len(v["high"]) == len(v["dates"]) and v["high"][-1] - v["values"][-1] == 2 and v["low"][-1] == v["values"][-1] - 1
+        assert ov["val"]["vix"]["high"] == ov["val"]["vix"]["value"] + 2
         assert quant([1, 2, 3, 4], .5) == 2.5 and pos([1, 2, 3, 4], 2) == 0.5
         print("selftest OK")
     finally:

@@ -818,7 +818,8 @@ async function renderUsPane(){
   if(V.erp) h+=usValCard("标普500 股权溢价", usFmt(V.erp.value,2)+'<span class="u"> %</span>',
     ["近5年百分位 "+usPos(V.erp.pct_5y), "近10年百分位 "+usPos(V.erp.pct_10y)], "盈利收益率 "+usFmt(V.erp.ey,2)+"% − 美债10年 "+usFmt(V.erp.us10y,2)+"%");
   if(V.vix) h+=usValCard("VIX 恐慌指数", usFmt(V.vix.value,2)+(V.vix.chg!=null?' <span class="u">'+(V.vix.chg>0?"+":"")+usFmt(V.vix.chg,2)+'</span>':''),
-    ["近5年百分位 "+usPos(V.vix.pct_5y), "近10年百分位 "+usPos(V.vix.pct_10y)], esc(V.vix.date));
+    [...(V.vix.high!=null&&V.vix.low!=null?["当日最高 "+usFmt(V.vix.high,2)+" · 最低 "+usFmt(V.vix.low,2)]:[]),
+     "近5年百分位 "+usPos(V.vix.pct_5y), "近10年百分位 "+usPos(V.vix.pct_10y)], esc(V.vix.date)+"（收盘）");
   h+='</div>';
   // 时间范围（与其他指数页共用）
   h+='<div class="erp-timebar">';
@@ -948,18 +949,28 @@ async function usDrawCape(K){
 }
 
 async function usDrawVix(X){
-  const all=await usSeries("vix"); if(!all.length) return;
+  const raw=await loadCached("us_api/series/vix.json").catch(()=>null);
+  const all=usPts(raw); if(!all.length) return;
+  const HL={}; if(raw&&raw.high&&raw.low) raw.dates.forEach((d,i)=>{ if(raw.high[i]!=null&&raw.low[i]!=null) HL[d]=[raw.low[i],raw.high[i]]; });
   const qv=await loadCached("us_api/qvix/csi300.json").catch(()=>null), qp=usPts(qv);
   const F=fltRange(all), dates=F.map(p=>p.date), q=X.q10y, ml=[];
   if(q) [["20%",q.p20,"#9c9a93"],["50%",q.p50,"#9c9a93"],["80%",q.p80,"#9c9a93"]].forEach(([l,v,c])=>ml.push({yAxis:v,lineStyle:{type:"dashed",color:"#c9c6bd",width:1},
     label:{formatter:l+"分位 "+v.toFixed(1),color:c,position:"end",distance:4,fontSize:11}}));
-  document.getElementById("usVixSub").textContent=(q?"分位线（近10年）：20% "+q.p20.toFixed(1)+"　50% "+q.p50.toFixed(1)+"　80% "+q.p80.toFixed(1):"")+
+  const hasHL=Object.keys(HL).length>0;
+  document.getElementById("usVixSub").textContent=(hasHL?"实线为收盘，浅色带为当日最高–最低区间；":"")+
+    (q?"分位线（近10年，按收盘）：20% "+q.p20.toFixed(1)+"　50% "+q.p50.toFixed(1)+"　80% "+q.p80.toFixed(1):"")+
     (qp.length?"；虚线为沪深300ETF 期权波动率 QVIX（A 股），可点图例隐藏":"");
   const qmap={}; qp.forEach(p=>qmap[p.date]=p.value);
+  const lo=dates.map(d=>HL[d]?HL[d][0]:null), span=dates.map(d=>HL[d]?+(HL[d][1]-HL[d][0]).toFixed(2):null);
   const el=echarts.init(document.getElementById("usVix"));
-  el.setOption({grid:{left:8,right:96,top:30,bottom:24,containLabel:true},legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3},
-    tooltip:{trigger:"axis",valueFormatter:v=>v==null?"—":Number(v).toFixed(2)},xAxis:US_X(dates),yAxis:{type:"value",scale:true,...US_AX},
-    series:[{name:"VIX",type:"line",showSymbol:false,lineStyle:{width:1.8},itemStyle:{color:"#6b5bd6"},data:F.map(p=>p.value),markLine:{silent:true,symbol:"none",data:ml}},
+  el.setOption({grid:{left:8,right:96,top:30,bottom:24,containLabel:true},legend:{top:0,icon:"roundRect",itemWidth:14,itemHeight:3,data:["VIX",...(hasHL?["当日高低区间"]:[]),...(qp.length?["沪深300 QVIX"]:[])]},
+    tooltip:{trigger:"axis",formatter:ps=>{ const i=ps[0].dataIndex, d=dates[i], f=v=>v==null?"—":Number(v).toFixed(2);
+      let t=d+"<br>VIX 收盘 <b>"+f(F[i].value)+"</b>"; if(HL[d]) t+="<br>当日最高 "+f(HL[d][1])+" · 最低 "+f(HL[d][0]);
+      if(qmap[d]!=null) t+="<br>沪深300 QVIX "+f(qmap[d]); return t; }},
+    xAxis:US_X(dates),yAxis:{type:"value",scale:true,...US_AX},
+    series:[...(hasHL?[{name:"__lo",type:"line",stack:"hl",showSymbol:false,silent:true,lineStyle:{opacity:0},itemStyle:{color:"transparent"},data:lo,connectNulls:true,tooltip:{show:false}},
+                       {name:"当日高低区间",type:"line",stack:"hl",showSymbol:false,silent:true,lineStyle:{opacity:0},itemStyle:{color:"#cfc8f3"},areaStyle:{color:"rgba(107,91,214,.22)"},data:span,connectNulls:true}]:[]),
+            {name:"VIX",type:"line",showSymbol:false,lineStyle:{width:1.8},itemStyle:{color:"#6b5bd6"},data:F.map(p=>p.value),markLine:{silent:true,symbol:"none",data:ml}},
             ...(qp.length?[{name:"沪深300 QVIX",type:"line",showSymbol:false,connectNulls:true,lineStyle:{width:1.3,type:"dashed"},itemStyle:{color:"#e0a53b"},data:dates.map(d=>qmap[d]??null)}]:[])]});
   erpCharts.push(el);
 }

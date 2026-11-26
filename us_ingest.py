@@ -27,7 +27,7 @@ UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit
 
 METRICS = {   # id: (名称, 单位)
     "ndx": ("纳斯达克100", "点"), "sox": ("费城半导体", "点"), "spx": ("标普500", "点"),
-    "vix": ("VIX 恐慌指数", ""), "pe_m": ("标普500 PE(TTM)", "倍"), "cape_m": ("席勒 CAPE", "倍"), "us10y": ("美国10年国债收益率", "%"),
+    "vix": ("VIX 恐慌指数", ""), "vix_high": ("VIX 日内最高", ""), "vix_low": ("VIX 日内最低", ""), "pe_m": ("标普500 PE(TTM)", "倍"), "cape_m": ("席勒 CAPE", "倍"), "us10y": ("美国10年国债收益率", "%"),
     "qvix_csi300": ("沪深300ETF 期权波动率 QVIX", ""), "qvix_cyb": ("创业板 期权波动率 QVIX", ""), "qvix_star50": ("科创板 期权波动率 QVIX", ""),
 }
 
@@ -107,16 +107,32 @@ def src_em(name):
     return f
 
 
-def src_cboe_vix():
-    txt = http_get("https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv", 60)
-    out = []
-    for r in list(csv.reader(io.StringIO(txt)))[1:]:
-        try:
-            out.append((datetime.strptime(r[0], "%m/%d/%Y").date().isoformat(), num(r[4])))
-        except (ValueError, IndexError):
-            pass
-    return out
-src_cboe_vix.__name__ = "cboe:VIX"
+_VIX_CSV = None
+
+
+def _vix_rows():
+    """CBOE VIX_History.csv：DATE,OPEN,HIGH,LOW,CLOSE。一次运行只下载一次，收盘/最高/最低共用"""
+    global _VIX_CSV
+    if _VIX_CSV is None:
+        _VIX_CSV = list(csv.reader(io.StringIO(
+            http_get("https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv", 60))))[1:]
+    return _VIX_CSV
+
+
+def _vix_col(col):
+    def f():
+        out = []
+        for r in _vix_rows():
+            try:
+                out.append((datetime.strptime(r[0], "%m/%d/%Y").date().isoformat(), num(r[col])))
+            except (ValueError, IndexError):
+                pass
+        return out
+    f.__name__ = "cboe:VIX" + {4: "", 2: ":high", 3: ":low"}[col]
+    return f
+
+
+src_cboe_vix = _vix_col(4)
 
 
 def parse_multpl(h):
@@ -167,6 +183,8 @@ SOURCES = {
     "sox": [src_sina(".SOX"), src_nasdaq("SOX")],
     "spx": [src_em("标普500"), src_sina(".INX")],
     "vix": [src_cboe_vix],
+    "vix_high": [_vix_col(2)],
+    "vix_low": [_vix_col(3)],
     "pe_m": [src_multpl("s-p-500-pe-ratio")],
     "cape_m": [src_multpl("shiller-pe")],
     "us10y": [src_us10y_macro_db, src_us10y_ak],          # 宏观库在前，akshare 在后覆盖（更新更及时）
